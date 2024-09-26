@@ -1,4 +1,4 @@
-module github.com/jackblack369/curvefs-csi
+module github.com/jackblack369/dingofs-csi
 
 go 1.22
 

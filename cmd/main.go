@@ -21,8 +21,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	curvefsdriver "github.com/jackblack369/curvefs-csi/pkg/curvefs-driver"
-	"github.com/jackblack369/curvefs-csi/pkg/util"
+	curvefsdriver "github.com/jackblack369/dingofs-csi/pkg/curvefs-driver"
+	"github.com/jackblack369/dingofs-csi/pkg/util"
 	"k8s.io/klog/v2"
 	"os"
 )

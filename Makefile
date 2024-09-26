@@ -5,7 +5,7 @@ BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 IMAGE_TAG := $(CSI_IMAGE_NAME):$(DRIVER_VERSION)
 
-GO_PROJECT := github.com/jackblack369/curvefs-csi
+GO_PROJECT := github.com/jackblack369/dingofs-csi
 
 LD_FLAGS ?=
 LD_FLAGS += -extldflags '-static'
