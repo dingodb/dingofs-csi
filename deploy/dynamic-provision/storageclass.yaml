@@ -1,0 +1,21 @@
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: dingofs-sc
+provisioner: csi.dingofs.com
+allowVolumeExpansion: false
+reclaimPolicy: Delete
+parameters:
+  mdsAddr: ""
+  fsType: ""
+  s3Endpoint: ""
+  s3AccessKey: ""
+  s3SecretKey: ""
+  s3Bucket: ""
+mountOptions:
+  - diskCache.diskCacheType=2
+  - block_cache.cache_store=disk
+  - disk_cache.cache_dir=/curvefs/client/data/cache/1:10240;/curvefs/client/data/cache/2:10240;/curvefs/client/data/cache/3:10240  # "/data1:100;/data2:200"
+  - disk_cache.cache_size_mb=102400   # MB
+
+

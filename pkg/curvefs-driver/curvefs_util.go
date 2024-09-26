@@ -52,6 +52,7 @@ func (ct *curvefsTool) CreateFs(
 	capacity int64,
 	params map[string]string,
 ) error {
+	klog.V(1).Infof("create fs, volumeID: %s, capacity: %d, params: %v", volumeID, capacity, params)
 	err := ct.validateCommonParams(params)
 	if err != nil {
 		return err
@@ -190,6 +191,7 @@ func (cm *curvefsMounter) MountFs(
 	mountOption *csi.VolumeCapability_MountVolume,
 	mountUUID string,
 ) error {
+	klog.V(1).Infof("mount fs, fsname: %s, \n mountPath: %s, \n params: %v, \n mountOption: %v, \n mountUUID: %s", fsname, mountPath, params, mountOption, mountUUID)
 	err := cm.validateMountFsParams(params)
 	if err != nil {
 		return err
