@@ -18,11 +18,11 @@ package curvefsdriver
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"os"
 	"path/filepath"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/google/uuid"
 	"github.com/jackblack369/dingofs-csi/pkg/csicommon"
 	"github.com/jackblack369/dingofs-csi/pkg/util"
 	"google.golang.org/grpc/codes"
@@ -41,6 +41,8 @@ func (ns *nodeServer) NodePublishVolume(
 	ctx context.Context,
 	req *csi.NodePublishVolumeRequest,
 ) (*csi.NodePublishVolumeResponse, error) {
+	mountUUID := uuid.New().String()
+	volumeContext := req.GetVolumeContext()
 	klog.V(5).Infof("%s: called with args %+v", util.GetCurrentFuncName(), *req)
 	volumeID := req.GetVolumeId()
 	targetPath := req.GetTargetPath()
@@ -50,7 +52,7 @@ func (ns *nodeServer) NodePublishVolume(
 	if !util.ValidateCharacter([]string{targetPath}) {
 		return nil, status.Errorf(codes.InvalidArgument, "Illegal TargetPath: %s", targetPath)
 	}
-	mountPath := filepath.Join(PodMountBase, volumeID)
+	mountPath := filepath.Join(PodMountBase, mountUUID, volumeID)
 	isNotMounted, _ := mount.IsNotMountPoint(ns.mounter, mountPath)
 	if !isNotMounted {
 		klog.V(5).Infof("%s is already mounted", mountPath)
@@ -66,12 +68,19 @@ func (ns *nodeServer) NodePublishVolume(
 		)
 	}
 
+	secrets := req.Secrets
+
+	curvefsTool := NewCurvefsTool()
+	err = curvefsTool.CreateFs(volumeContext, secrets)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Create fs failed: %v", err)
+	}
+
 	curvefsMounter := NewCurvefsMounter()
-	mountUUID := uuid.New().String()
 
 	klog.V(1).Infof("mountPath: %s", mountPath)
-	err = curvefsMounter.MountFs(volumeID, mountPath, req.GetVolumeContext(),
-		req.GetVolumeCapability().GetMount(), mountUUID)
+	mountOption := req.GetVolumeCapability().GetMount()
+	err = curvefsMounter.MountFs(mountPath, volumeContext, mountOption, mountUUID, secrets)
 	if err != nil {
 		return nil, status.Errorf(
 			codes.Internal,
