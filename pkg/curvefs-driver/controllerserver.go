@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+	"strconv"
 )
 
 type controllerServer struct {
@@ -56,16 +57,20 @@ func (cs *controllerServer) CreateVolume(
 	}
 	capacity := req.GetCapacityRange().GetRequiredBytes()
 	// call curvefs_tool create-fs
-	curvefsTool := NewCurvefsTool()
-	err := curvefsTool.CreateFs(volumeID, capacity, req.GetParameters())
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Create fs failed: %v", err)
-	}
+	//curvefsTool := NewCurvefsTool()
+	//err := curvefsTool.CreateFs(volumeID, capacity, req.GetParameters())
+	//if err != nil {
+	//	return nil, status.Errorf(codes.Internal, "Create fs failed: %v", err)
+	//}
+
 	// set volume context
 	volumeContext := make(map[string]string)
 	for k, v := range req.Parameters {
 		volumeContext[k] = v
 	}
+
+	volumeContext["capacity"] = strconv.FormatInt(capacity, 10)
+
 	volume := csi.Volume{
 		VolumeId:      volumeID,
 		CapacityBytes: capacity,

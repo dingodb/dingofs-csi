@@ -43,25 +43,31 @@ type curvefsTool struct {
 	toolParams map[string]string
 }
 
+var fss = map[string]string{}
+
 func NewCurvefsTool() *curvefsTool {
 	return &curvefsTool{toolParams: map[string]string{}}
 }
 
 func (ct *curvefsTool) CreateFs(
-	volumeID string,
-	capacity int64,
 	params map[string]string,
+	secrets map[string]string,
 ) error {
-	klog.V(1).Infof("create fs, volumeID: %s, capacity: %d, params: %v", volumeID, capacity, params)
-	err := ct.validateCommonParams(params)
+	fsName := secrets["name"]
+	if _, ok := fss[fsName]; ok {
+		klog.Infof("file system: %s has beed already created", fsName)
+		return nil
+	}
+	capacity := params["capacity"]
+	err := ct.validateCommonParams(secrets)
 	if err != nil {
 		return err
 	}
-	err = ct.validateCreateFsParams(params)
+	err = ct.validateCreateFsParams(secrets)
 	if err != nil {
 		return err
 	}
-	ct.toolParams["fsName"] = volumeID
+	ct.toolParams["fsName"] = fsName
 	// todo: current capacity is not working
 	// call curvefs_tool create-fs to create a fs
 	createFsArgs := []string{"create-fs"}
@@ -70,7 +76,7 @@ func (ct *curvefsTool) CreateFs(
 		createFsArgs = append(createFsArgs, arg)
 	}
 	klog.V(1).Infof("create fs, createFsArgs: %v", createFsArgs)
-	createFsCmd := exec.Command(toolPath, createFsArgs...)
+	createFsCmd := exec.Command(toolPath, createFsArgs...) //
 	output, err := createFsCmd.CombinedOutput()
 	if err != nil {
 		return status.Errorf(
@@ -82,6 +88,8 @@ func (ct *curvefsTool) CreateFs(
 			err,
 		)
 	}
+	fss[fsName] = fsName
+	klog.Infof("create fs success, fsName: %s, capacity: %s, params: %v", fsName, capacity, params)
 	return nil
 }
 
@@ -185,14 +193,15 @@ func NewCurvefsMounter() *curvefsMounter {
 }
 
 func (cm *curvefsMounter) MountFs(
-	fsname string,
 	mountPath string,
 	params map[string]string,
 	mountOption *csi.VolumeCapability_MountVolume,
 	mountUUID string,
+	secrets map[string]string,
 ) error {
+	fsname := secrets["name"]
 	klog.V(1).Infof("mount fs, fsname: %s, \n mountPath: %s, \n params: %v, \n mountOption: %v, \n mountUUID: %s", fsname, mountPath, params, mountOption, mountUUID)
-	err := cm.validateMountFsParams(params)
+	err := cm.validateMountFsParams(secrets)
 	if err != nil {
 		return err
 	}

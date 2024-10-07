@@ -25,3 +25,6 @@ vendor/
 *.orig
 *.patch
 *.rej
+
+# deploy secret
+deploy/multiple-fs/dingofs-secret-multiple.yaml
