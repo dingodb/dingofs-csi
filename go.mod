@@ -1,4 +1,4 @@
-module github.com/jackblack369/dingofs-csi
+module github.com/dingodb/dingofs-csi
 
 go 1.22
 
