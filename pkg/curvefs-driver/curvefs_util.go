@@ -18,11 +18,12 @@ package curvefsdriver
 
 import (
 	"fmt"
-	"k8s.io/klog/v2"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"k8s.io/klog/v2"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
@@ -32,21 +33,23 @@ import (
 const (
 	defaultToolExampleConfPath   = "/curvefs/conf/tools.conf"
 	defaultClientExampleConfPath = "/curvefs/conf/client.conf"
-	toolPath                     = "/curvefs/tools/sbin/curvefs_tool"
-	clientPath                   = "/curvefs/client/sbin/curve-fuse"
-	cacheDirPrefix               = "/curvefs/client/data/cache/"
-	PodMountBase                 = "/dfs"
-	MountBase                    = "/var/lib/dfs"
+	// toolPath                     = "/curvefs/tools/sbin/curvefs_tool"
+	toolPath       = "/curvefs/tools-v2/sbin/curve"
+	clientPath     = "/curvefs/client/sbin/curve-fuse"
+	cacheDirPrefix = "/curvefs/client/data/cache/"
+	PodMountBase   = "/dfs"
+	MountBase      = "/var/lib/dfs"
 )
 
 type curvefsTool struct {
-	toolParams map[string]string
+	toolParams  map[string]string
+	quotaParams map[string]string
 }
 
 var fss = map[string]string{}
 
 func NewCurvefsTool() *curvefsTool {
-	return &curvefsTool{toolParams: map[string]string{}}
+	return &curvefsTool{toolParams: map[string]string{}, quotaParams: map[string]string{}}
 }
 
 func (ct *curvefsTool) CreateFs(
@@ -54,34 +57,37 @@ func (ct *curvefsTool) CreateFs(
 	secrets map[string]string,
 ) error {
 	fsName := secrets["name"]
-	if _, ok := fss[fsName]; ok {
-		klog.Infof("file system: %s has beed already created", fsName)
-		return nil
-	}
+	//if _, ok := fss[fsName]; ok {
+	//	klog.Infof("file system: %s has beed already created", fsName)
+	//	return nil
+	//}
+	// check fs exist or not
+
 	capacity := params["capacity"]
-	err := ct.validateCommonParams(secrets)
+	err := ct.validateCommonParamsV2(secrets)
 	if err != nil {
 		return err
 	}
-	err = ct.validateCreateFsParams(secrets)
+	err = ct.validateCreateFsParamsV2(secrets)
 	if err != nil {
 		return err
 	}
 	ct.toolParams["fsName"] = fsName
 	// todo: current capacity is not working
 	// call curvefs_tool create-fs to create a fs
-	createFsArgs := []string{"create-fs"}
+	createFsArgs := []string{"create fs"}
 	for k, v := range ct.toolParams {
 		arg := fmt.Sprintf("-%s=%s", k, v)
 		createFsArgs = append(createFsArgs, arg)
 	}
+
 	klog.V(1).Infof("create fs, createFsArgs: %v", createFsArgs)
 	createFsCmd := exec.Command(toolPath, createFsArgs...) //
 	output, err := createFsCmd.CombinedOutput()
 	if err != nil {
 		return status.Errorf(
 			codes.Internal,
-			"Curvefs_tool create-fs failed. cmd: %s %v, output: %s, err: %v",
+			"curve create fs failed. cmd: %s %v, output: %s, err: %v",
 			toolPath,
 			createFsArgs,
 			output,
@@ -90,6 +96,28 @@ func (ct *curvefsTool) CreateFs(
 	}
 	fss[fsName] = fsName
 	klog.Infof("create fs success, fsName: %s, capacity: %s, params: %v", fsName, capacity, params)
+
+	configQuotaArgs := []string{"config fs", "-fsname=" + fsName}
+	if len(ct.quotaParams) != 0 {
+		for k, v := range ct.quotaParams {
+			arg := fmt.Sprintf("-%s=%s", k, v)
+			createFsArgs = append(configQuotaArgs, arg)
+		}
+		klog.V(1).Infof("config fs, configQuotaArgs: %v", configQuotaArgs)
+		configQuotaCmd := exec.Command(toolPath, configQuotaArgs...)
+		outputQuota, errQuota := configQuotaCmd.CombinedOutput()
+		if errQuota != nil {
+			return status.Errorf(
+				codes.Internal,
+				"curve config fs quota failed. cmd: %s %v, output: %s, err: %v",
+				toolPath,
+				configQuotaArgs,
+				outputQuota,
+				errQuota,
+			)
+		}
+	}
+
 	return nil
 }
 
@@ -98,7 +126,7 @@ func (ct *curvefsTool) DeleteFs(volumeID string, params map[string]string) error
 	if err != nil {
 		return err
 	}
-	ct.toolParams["fsName"] = volumeID
+	ct.toolParams["fsName"] = volumeID // todo change to fsName
 	ct.toolParams["noconfirm"] = "1"
 	// call curvefs_tool delete-fs to create a fs
 	deleteFsArgs := []string{"delete-fs"}
@@ -121,6 +149,55 @@ func (ct *curvefsTool) DeleteFs(volumeID string, params map[string]string) error
 	return nil
 }
 
+func (ct *curvefsTool) CheckFsExisted(fsName string, mdsAddr string) error {
+
+}
+
+func (ct *curvefsTool) ListFs(mdsAddr string) error {
+	// call curve list fs --mdsaddr=<mdsaddr>
+	listFsArgs := []string{"list", "--mdsaddr=" + mdsAddr}
+	listFsCmd := exec.Command(toolPath, listFsArgs...)
+	output, err := listFsCmd.CombinedOutput()
+	if err != nil {
+		return status.Errorf(
+			codes.Internal,
+			"curvefs_tool list-fs failed. cmd:%s %v, output: %s, err: %v",
+			toolPath,
+			listFsArgs,
+			output,
+			err,
+		)
+	}
+	return nil
+}
+
+func (ct *curvefsTool) SetVolumeQuota(volumeID string, params map[string]string) error {
+	err := ct.validateCommonParams(params)
+	if err != nil {
+		return err
+	}
+	ct.toolParams["fsName"] = volumeID
+	// call curvefs set quota to set volume quota
+	setQuotaArgs := []string{"set-quota"}
+	for k, v := range ct.toolParams {
+		arg := fmt.Sprintf("-%s=%s", k, v)
+		setQuotaArgs = append(setQuotaArgs, arg)
+	}
+	setQuotaCmd := exec.Command(toolPath, setQuotaArgs...)
+	output, err := setQuotaCmd.CombinedOutput()
+	if err != nil {
+		return status.Errorf(
+			codes.Internal,
+			"curvefs_tool set-quota failed. cmd:%s %v, output: %s, err: %v",
+			toolPath,
+			setQuotaArgs,
+			output,
+			err,
+		)
+	}
+	return nil
+}
+
 func (ct *curvefsTool) validateCommonParams(params map[string]string) error {
 	if mdsAddr, ok := params["mdsAddr"]; ok {
 		ct.toolParams["mdsAddr"] = mdsAddr
@@ -131,6 +208,15 @@ func (ct *curvefsTool) validateCommonParams(params map[string]string) error {
 		ct.toolParams["confPath"] = confPath
 	} else {
 		ct.toolParams["confPath"] = defaultToolExampleConfPath
+	}
+	return nil
+}
+
+func (ct *curvefsTool) validateCommonParamsV2(params map[string]string) error {
+	if mdsAddr, ok := params["mdsAddr"]; ok {
+		ct.toolParams["mdsaddr"] = mdsAddr
+	} else {
+		return status.Error(codes.InvalidArgument, "mdsAddr is missing")
 	}
 	return nil
 }
@@ -181,6 +267,59 @@ func (ct *curvefsTool) validateCreateFsParams(params map[string]string) error {
 	} else {
 		return status.Error(codes.InvalidArgument, "fsType is missing")
 	}
+	return nil
+}
+
+func (ct *curvefsTool) validateCreateFsParamsV2(params map[string]string) error {
+	if fsType, ok := params["fsType"]; ok {
+		ct.toolParams["fstype"] = fsType
+
+		if fsType == "s3" {
+			s3Endpoint, ok1 := params["s3Endpoint"]
+			s3AccessKey, ok2 := params["s3AccessKey"]
+			s3SecretKey, ok3 := params["s3SecretKey"]
+			s3Bucket, ok4 := params["s3Bucket"]
+			if ok1 && ok2 && ok3 && ok4 {
+				ct.toolParams["s3.endpoint"] = s3Endpoint
+				ct.toolParams["s3.ak"] = s3AccessKey
+				ct.toolParams["s3.sk"] = s3SecretKey
+				ct.toolParams["s3.bucketname"] = s3Bucket
+			} else {
+				return status.Error(codes.InvalidArgument, "s3Info is incomplete")
+			}
+		} else if fsType == "volume" {
+			if backendVolName, ok := params["backendVolName"]; ok {
+				ct.toolParams["volumeName"] = backendVolName
+			} else {
+				return status.Error(codes.InvalidArgument, "backendVolName is missing")
+			}
+			if backendVolSizeGB, ok := params["backendVolSizeGB"]; ok {
+				backendVolSizeGBInt, err := strconv.ParseInt(backendVolSizeGB, 0, 64)
+				if err != nil {
+					return status.Error(codes.InvalidArgument, "backendVolSize is not integer")
+				}
+				if backendVolSizeGBInt < 10 {
+					return status.Error(codes.InvalidArgument, "backendVolSize must larger than 10GB")
+				}
+				ct.toolParams["volumeSize"] = backendVolSizeGB
+			} else {
+				return status.Error(codes.InvalidArgument, "backendVolSize is missing")
+			}
+		} else {
+			return status.Errorf(codes.InvalidArgument, "unsupported fsType %s", fsType)
+		}
+	} else {
+		return status.Error(codes.InvalidArgument, "fsType is missing")
+	}
+
+	if quotaCapacity, ok := params["quotaCapacity"]; ok {
+		ct.quotaParams["capacity"] = quotaCapacity
+	}
+
+	if quotaInodes, ok := params["quotaInodes"]; ok {
+		ct.quotaParams["inodes"] = quotaInodes
+	}
+
 	return nil
 }
 

@@ -18,9 +18,10 @@ package curvefsdriver
 
 import (
 	"context"
-	"github.com/google/uuid"
 	"os"
 	"path/filepath"
+
+	"github.com/google/uuid"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/jackblack369/dingofs-csi/pkg/csicommon"
@@ -52,7 +53,7 @@ func (ns *nodeServer) NodePublishVolume(
 	if !util.ValidateCharacter([]string{targetPath}) {
 		return nil, status.Errorf(codes.InvalidArgument, "Illegal TargetPath: %s", targetPath)
 	}
-	mountPath := filepath.Join(PodMountBase, mountUUID, volumeID)
+	mountPath := filepath.Join(PodMountBase, mountUUID)
 	isNotMounted, _ := mount.IsNotMountPoint(ns.mounter, mountPath)
 	if !isNotMounted {
 		klog.V(5).Infof("%s is already mounted", mountPath)
@@ -99,6 +100,17 @@ func (ns *nodeServer) NodePublishVolume(
 		)
 	}
 
+	dataPath := filepath.Join(PodMountBase, mountUUID, volumeID)
+	err = util.CreatePath(dataPath)
+	if err != nil {
+		return nil, status.Errorf(
+			codes.Internal,
+			"Failed to create data path %s, err: %v",
+			dataPath,
+			err,
+		)
+	}
+
 	err = util.CreatePath(targetPath)
 	if err != nil {
 		return nil, status.Errorf(
@@ -111,20 +123,30 @@ func (ns *nodeServer) NodePublishVolume(
 
 	ns.mountRecord[targetPath] = mountUUID
 
-	// bind mount point to target path
-	if err := ns.mounter.Mount(mountPath, targetPath, "none", []string{"bind"}); err != nil {
+	// bind data path to target path
+	klog.V(1).Infof("bind %s to %s", dataPath, targetPath)
+	if err := ns.mounter.Mount(dataPath, targetPath, "none", []string{"bind"}); err != nil {
 		err := os.Remove(targetPath)
 		if err != nil {
 			return nil, err
 		}
 		return nil, status.Errorf(
 			codes.Internal,
-			"Failed to mount %s to %s, err: %v",
-			mountPath,
+			"Failed to bind %s to %s, err: %v",
+			dataPath,
 			targetPath,
 			err,
 		)
 	}
+
+	// config volume quota
+	//if cap, exist := volumeContext["capacity"]; exist {
+	//	capacity, err := strconv.ParseInt(cap, 10, 64)
+	//	if err != nil {
+	//		return nil, status.Errorf(codes.Internal, "invalid capacity %s: %v", cap, err)
+	//	}
+
+	//}
 
 	return &csi.NodePublishVolumeResponse{}, nil
 }

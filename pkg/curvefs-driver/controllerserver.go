@@ -23,7 +23,6 @@ import (
 	"github.com/jackblack369/dingofs-csi/pkg/util"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"strconv"
@@ -90,18 +89,18 @@ func (cs *controllerServer) DeleteVolume(
 		return nil, status.Error(codes.InvalidArgument, "Volume ID is missing")
 	}
 	// call curvefs_tool delete-fs
-	curvefsTool := NewCurvefsTool()
-	pvInfo, err := cs.kubeClient.CoreV1().
-		PersistentVolumes().
-		Get(context.Background(), req.VolumeId, metav1.GetOptions{})
-	params := pvInfo.Spec.CSI.VolumeAttributes
-	err = curvefsTool.DeleteFs(volumeID, params)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Delete fs failed: %v", err)
-	}
-	if _, ok := vols[req.VolumeId]; ok {
-		delete(vols, req.VolumeId)
-	}
+	//curvefsTool := NewCurvefsTool()
+	//pvInfo, err := cs.kubeClient.CoreV1().
+	//	PersistentVolumes().
+	//	Get(context.Background(), req.VolumeId, metav1.GetOptions{})
+	//params := pvInfo.Spec.CSI.VolumeAttributes
+	//err = curvefsTool.DeleteFs(volumeID, params) // todo replace delete volume with delete fs
+	//if err != nil {
+	//	return nil, status.Errorf(codes.Internal, "Delete fs failed: %v", err)
+	//}
+	//if _, ok := vols[req.VolumeId]; ok {
+	//	delete(vols, req.VolumeId)
+	//}
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
