@@ -1,16 +1,23 @@
-package pkg_dingofs
+package tests
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 	"testing"
 )
 
 const (
 	toolPath = "/home/dongwei/script/curve"
 )
+
+type FsInfo struct {
+	ID     int    `json:"id"`
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
 
 func TestGetClusterFsInfo(t *testing.T) {
 	mdsAddr := "172.20.7.232:16700,172.20.7.233:16700,172.20.7.234:16700"
@@ -27,11 +34,33 @@ func TestGetClusterFsInfo(t *testing.T) {
 		fmt.Printf("Failed to list filesystems: %v\n", err)
 	}
 
-	// Marshal fsInfo to JSON
-	fsInfoJson, errFormat := json.MarshalIndent(fsInfos, "", "  ")
-	if errFormat != nil {
-		t.Fatalf("Failed to marshal fsInfo to JSON: %v", errFormat)
+	// Parse the command output
+	lines := strings.Split(string(fsInfos), "\n")
+	var fsInfoList []FsInfo
+	for _, line := range lines {
+		if strings.HasPrefix(line, "+") || strings.HasPrefix(line, "| ID") || line == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		id := parseInt(fields[1])
+		fsInfo := FsInfo{
+			ID:     id,
+			Name:   fields[3],
+			Status: fields[5],
+		}
+		fsInfoList = append(fsInfoList, fsInfo)
 	}
-	fmt.Println(string(fsInfoJson))
 
+	for _, fsInfo := range fsInfoList {
+		fmt.Printf("ID: %d, Name: %s, Status: %s\n", fsInfo.ID, fsInfo.Name, fsInfo.Status)
+	}
+
+}
+
+func parseInt(s string) int {
+	i, _ := strconv.Atoi(s)
+	return i
 }

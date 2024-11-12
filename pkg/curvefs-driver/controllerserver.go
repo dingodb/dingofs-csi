@@ -18,6 +18,8 @@ package curvefsdriver
 
 import (
 	"context"
+	"strconv"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/jackblack369/dingofs-csi/pkg/csicommon"
 	"github.com/jackblack369/dingofs-csi/pkg/util"
@@ -25,7 +27,6 @@ import (
 	"google.golang.org/grpc/status"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
-	"strconv"
 )
 
 type controllerServer struct {

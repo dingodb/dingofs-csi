@@ -20,6 +20,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/google/uuid"
 
@@ -35,7 +36,7 @@ import (
 type nodeServer struct {
 	*csicommon.DefaultNodeServer
 	mounter     mount.Interface
-	mountRecord map[string]string // targetPath -> a uuid
+	mountRecord map[string]map[string]string // targetPath -> a uuid : mountUUID, pid: mountPID
 }
 
 func (ns *nodeServer) NodePublishVolume(
@@ -81,7 +82,7 @@ func (ns *nodeServer) NodePublishVolume(
 
 	klog.V(1).Infof("mountPath: %s", mountPath)
 	mountOption := req.GetVolumeCapability().GetMount()
-	err = curvefsMounter.MountFs(mountPath, volumeContext, mountOption, mountUUID, secrets)
+	pid, err := curvefsMounter.MountFs(mountPath, volumeContext, mountOption, mountUUID, secrets)
 	if err != nil {
 		return nil, status.Errorf(
 			codes.Internal,
@@ -121,7 +122,10 @@ func (ns *nodeServer) NodePublishVolume(
 		)
 	}
 
-	ns.mountRecord[targetPath] = mountUUID
+	ns.mountRecord[targetPath] = map[string]string{
+		"mountUUID": mountUUID,
+		"pid":       strconv.Itoa(pid),
+	}
 
 	// bind data path to target path
 	klog.V(1).Infof("bind %s to %s", dataPath, targetPath)
@@ -140,13 +144,18 @@ func (ns *nodeServer) NodePublishVolume(
 	}
 
 	// config volume quota
-	//if cap, exist := volumeContext["capacity"]; exist {
-	//	capacity, err := strconv.ParseInt(cap, 10, 64)
-	//	if err != nil {
-	//		return nil, status.Errorf(codes.Internal, "invalid capacity %s: %v", cap, err)
-	//	}
-
-	//}
+	if capacityStr, exist := volumeContext["capacity"]; exist {
+		capacityBytes, err := strconv.ParseInt(capacityStr, 10, 64)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "invalid capacity %s: %v", capacityStr, err)
+		}
+		// convert byte to GB
+		capacityGB := util.ByteToGB(capacityBytes)
+		err = curvefsTool.SetVolumeQuota(curvefsTool.toolParams["mdsaddr"], volumeID, secrets["name"], strconv.FormatInt(capacityGB, 10), volumeContext["inodes"])
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Set volume quota failed: %v", err)
+		}
+	}
 
 	return &csi.NodePublishVolumeResponse{}, nil
 }
@@ -171,7 +180,7 @@ func (ns *nodeServer) NodeUnpublishVolume(
 	}
 
 	curvefsMounter := NewCurvefsMounter()
-	mountUUID := ns.mountRecord[targetPath]
+	mountUUID := ns.mountRecord[targetPath]["mountUUID"]
 	err := curvefsMounter.UmountFs(targetPath, mountUUID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal,
@@ -189,6 +198,17 @@ func (ns *nodeServer) NodeUnpublishVolume(
 			targetPath,
 		)
 	}
+
+	// kill process by pid
+	pid, err := strconv.Atoi(ns.mountRecord[targetPath]["pid"])
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Failed to convert pid to int, err: %v", err)
+	}
+	err = util.KillProcess(pid)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Failed to kill process, err: %v", err)
+	}
+
 	delete(ns.mountRecord, targetPath)
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }

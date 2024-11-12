@@ -23,6 +23,9 @@ import (
 	"os"
 	"regexp"
 	"runtime"
+	"strconv"
+
+	"k8s.io/klog/v2"
 )
 
 func ValidateCharacter(inputs []string) bool {
@@ -54,4 +57,36 @@ func CreatePath(path string) error {
 func GetCurrentFuncName() string {
 	pc, _, _, _ := runtime.Caller(1)
 	return fmt.Sprintf("%s", runtime.FuncForPC(pc).Name())
+}
+
+// ByteToGB converts bytes to gigabytes
+func ByteToGB(bytes int64) int64 {
+	const bytesPerGB = 1024 * 1024 * 1024
+	return bytes / bytesPerGB
+}
+
+func ParseInt(s string) int {
+	i, _ := strconv.Atoi(s)
+	return i
+}
+
+func ParseBool(s string) bool {
+	return s == "true"
+}
+
+func KillProcess(pid int) error {
+	// Find the process by PID
+	process, err := os.FindProcess(pid)
+	if err != nil {
+		return fmt.Errorf("failed to find process: %v", err)
+	}
+
+	// Kill the process
+	err = process.Kill()
+	if err != nil {
+		return fmt.Errorf("failed to kill process: %v", err)
+	}
+	klog.Infof("killed process [%d] success !", pid)
+
+	return nil
 }
