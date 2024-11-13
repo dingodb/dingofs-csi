@@ -89,8 +89,7 @@ func (ct *curvefsTool) CreateFs(
 		return err
 	}
 	ct.toolParams["fsname"] = fsName
-	// todo: current capacity is not working
-	// call curvefs_tool create-fs to create a fs
+	// call curvefs create fs to create a fs
 	createFsArgs := []string{"create", "fs"}
 	for k, v := range ct.toolParams {
 		arg := fmt.Sprintf("--%s=%s", k, v)
@@ -111,7 +110,7 @@ func (ct *curvefsTool) CreateFs(
 		)
 	}
 
-	configQuotaArgs := []string{"config", "fs", "-fsname=" + fsName}
+	configQuotaArgs := []string{"config", "fs", "--fsname=" + fsName, "--mdsaddr=" + ct.toolParams["mdsaddr"]}
 	if len(ct.quotaParams) != 0 {
 		for k, v := range ct.quotaParams {
 			arg := fmt.Sprintf("--%s=%s", k, v)
@@ -399,6 +398,10 @@ func (cm *curvefsMounter) MountFs(
 	}
 
 	for k, v := range cm.mounterParams {
+		// exclude cache_dir from mount options
+		if k == "cache_dir" {
+			continue
+		}
 		if _, ok := doubleDashArgs[k]; ok {
 			arg := fmt.Sprintf("--%s=%s", k, v)
 			mountFsArgs = append(mountFsArgs, arg)
@@ -410,6 +413,16 @@ func (cm *curvefsMounter) MountFs(
 	}
 
 	mountFsArgs = append(mountFsArgs, mountPath)
+
+	err = util.CreatePath(mountPath)
+	if err != nil {
+		return 0, status.Errorf(
+			codes.Internal,
+			"Failed to create mount point path %s, err: %v",
+			mountPath,
+			err,
+		)
+	}
 
 	klog.V(3).Infof("curve-fuse mountFsArgs: %s", mountFsArgs)
 	mountFsCmd := exec.Command(clientPath, mountFsArgs...)
@@ -426,11 +439,11 @@ func (cm *curvefsMounter) MountFs(
 	}
 	// get command process id
 	pid := mountFsCmd.Process.Pid
-	klog.V(1).Infof("curve-fuse mount success, pid: %d", pid)
-	return pid, nil
+	klog.V(1).Infof("curve-fuse mount success, pid: %d", pid+2)
+	return pid + 2, nil
 }
 
-func (cm *curvefsMounter) UmountFs(targetPath string, mountUUID string) error {
+func (cm *curvefsMounter) UmountFs(targetPath string, mountUUID string, cacheDirs string) error {
 	// umount TargetCmd volume /var/lib/kubelet/pods/15c066c3-3399-42c6-be63-74c95aa97eba/volumes/kubernetes.io~csi/pvc-c1b121a6-a698-4b5e-b847-c4c2ea110dee/mount
 	umountTargetCmd := exec.Command("umount", targetPath)
 	output, err := umountTargetCmd.CombinedOutput()
@@ -445,13 +458,14 @@ func (cm *curvefsMounter) UmountFs(targetPath string, mountUUID string) error {
 	}
 
 	// umount sourcePath /dfs/fe5d0340-b5fa-491b-b826-1129c12de962
-	umountFsCmd := exec.Command("umount", PodMountBase+"/"+mountUUID)
+	mountDir := PodMountBase + "/" + mountUUID
+	umountFsCmd := exec.Command("umount", mountDir)
 	output, err = umountFsCmd.CombinedOutput()
 	if err != nil {
 		return status.Errorf(
 			codes.Internal,
 			"umount %s failed. output: %s, err: %v",
-			PodMountBase+"/"+mountUUID,
+			mountDir,
 			output,
 			err,
 		)
@@ -459,9 +473,16 @@ func (cm *curvefsMounter) UmountFs(targetPath string, mountUUID string) error {
 	// do cleanup, config file and cache dir
 	if mountUUID != "" {
 		confPath := defaultClientExampleConfPath + "." + mountUUID
-		cacheDir := cacheDirPrefix + mountUUID
 		go os.Remove(confPath)
-		go os.RemoveAll(cacheDir)
+
+		// cacheDir := cacheDirPrefix + mountUUID // TODO remove all cache dir by specify mountUUID
+		// go os.RemoveAll(cacheDir)
+		for _, path := range strings.Split(cacheDirs, ";") {
+			klog.Infof("remove cache dir: %s", path)
+			go os.RemoveAll(path)
+		}
+
+		go os.RemoveAll(mountDir)
 	}
 	return nil
 }
@@ -479,7 +500,7 @@ func (cm *curvefsMounter) applyMountFlags(
 	if err != nil {
 		return "", status.Errorf(
 			codes.Internal,
-			"applyMountFlag: failed to read conf %v",
+			"applyMountFlag: failed to read conf %s, %v",
 			origConfPath,
 			err,
 		)
@@ -488,7 +509,7 @@ func (cm *curvefsMounter) applyMountFlags(
 	if err != nil {
 		return "", status.Errorf(
 			codes.Internal,
-			"applyMountFlag: failed to write new conf %v",
+			"applyMountFlag: failed to write new conf %s, %v",
 			confPath,
 			err,
 		)
@@ -499,7 +520,7 @@ func (cm *curvefsMounter) applyMountFlags(
 	if err != nil {
 		return "", status.Errorf(
 			codes.Internal,
-			"applyMountFlag: failed to read new conf %v",
+			"applyMountFlag: failed to read new conf %s, %v",
 			confPath,
 			err,
 		)
@@ -538,16 +559,21 @@ func (cm *curvefsMounter) applyMountFlags(
 		if newValue, exists := configMap[parts[0]]; exists {
 			if parts[0] == "disk_cache.cache_dir" {
 				cacheDirs := strings.Split(newValue, ";")
-				cacheDirsWithUUID := make([]string, len(cacheDirs))
+				cacheDirsWithCapacity := make([]string, len(cacheDirs))
+				cacheDirsPaths := make([]string, len(cacheDirs))
 				for i, cacheDir := range cacheDirs {
 					cacheDirParts := strings.SplitN(cacheDir, ":", 2)
 					if len(cacheDirParts) == 2 {
-						cacheDirsWithUUID[i] = fmt.Sprintf("%s/%s:%s", cacheDirParts[0], mountUUID, cacheDirParts[1])
+						cacheDirsWithCapacity[i] = fmt.Sprintf("%s/%s:%s", cacheDirParts[0], mountUUID, cacheDirParts[1])
 					} else {
-						cacheDirsWithUUID[i] = fmt.Sprintf("%s/%s", cacheDirParts[0], mountUUID)
+						cacheDirsWithCapacity[i] = fmt.Sprintf("%s/%s", cacheDirParts[0], mountUUID)
 					}
+					cacheDirsPaths[i] = fmt.Sprintf("%s/%s", cacheDirParts[0], mountUUID)
 				}
-				newValue = strings.Join(cacheDirsWithUUID, ";")
+				newValue = strings.Join(cacheDirsWithCapacity, ";")
+				// buffer the cache dir for later use
+				cm.mounterParams["cache_dir"] = strings.Join(cacheDirsPaths, ";")
+
 			}
 			newData.WriteString(fmt.Sprintf("%s=%s\n", parts[0], newValue))
 			delete(configMap, parts[0])
@@ -565,17 +591,22 @@ func (cm *curvefsMounter) applyMountFlags(
 	if err != nil {
 		return "", status.Errorf(
 			codes.Internal,
-			"applyMountFlag: failed to write updated conf %v",
+			"applyMountFlag: failed to write updated conf %s, %v",
 			confPath,
 			err,
 		)
 	}
 
 	if cacheEnabled {
-		cacheDir := cacheDirPrefix + mountUUID
-		if err := os.MkdirAll(cacheDir, 0777); err != nil {
-			return "", err
+		for _, cacheDir := range strings.Split(cm.mounterParams["cache_dir"], ";") {
+			if err := os.MkdirAll(cacheDir, 0777); err != nil {
+				return "", err
+			}
 		}
+		//cacheDir := cacheDirPrefix + mountUUID
+		//if err := os.MkdirAll(cacheDir, 0777); err != nil {
+		//	return "", err
+		//}
 	}
 
 	return confPath, nil

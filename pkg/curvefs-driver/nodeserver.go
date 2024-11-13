@@ -60,20 +60,11 @@ func (ns *nodeServer) NodePublishVolume(
 		klog.V(5).Infof("%s is already mounted", mountPath)
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
-	err := util.CreatePath(mountPath)
-	if err != nil {
-		return nil, status.Errorf(
-			codes.Internal,
-			"Failed to create mount point path %s, err: %v",
-			mountPath,
-			err,
-		)
-	}
 
 	secrets := req.Secrets
 
 	curvefsTool := NewCurvefsTool()
-	err = curvefsTool.CreateFs(volumeContext, secrets)
+	err := curvefsTool.CreateFs(volumeContext, secrets)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Create fs failed: %v", err)
 	}
@@ -125,6 +116,7 @@ func (ns *nodeServer) NodePublishVolume(
 	ns.mountRecord[targetPath] = map[string]string{
 		"mountUUID": mountUUID,
 		"pid":       strconv.Itoa(pid),
+		"cacheDirs": curvefsMounter.mounterParams["cache_dir"],
 	}
 
 	// bind data path to target path
@@ -181,7 +173,8 @@ func (ns *nodeServer) NodeUnpublishVolume(
 
 	curvefsMounter := NewCurvefsMounter()
 	mountUUID := ns.mountRecord[targetPath]["mountUUID"]
-	err := curvefsMounter.UmountFs(targetPath, mountUUID)
+	cacheDirs := ns.mountRecord[targetPath]["cacheDirs"]
+	err := curvefsMounter.UmountFs(targetPath, mountUUID, cacheDirs)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal,
 			"Failed to umount %s, err: %v",
