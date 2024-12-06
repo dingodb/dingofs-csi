@@ -35,8 +35,8 @@ const (
 	defaultToolExampleConfPath   = "/curvefs/conf/tools.conf"
 	defaultClientExampleConfPath = "/curvefs/conf/client.conf"
 	// toolPath                     = "/curvefs/tools/sbin/curvefs_tool"
-	toolPath       = "/curvefs/tools-v2/sbin/curve"
-	clientPath     = "/curvefs/client/sbin/curve-fuse"
+	toolPath       = "/curvefs/tools-v2/sbin/dingo"
+	clientPath     = "/curvefs/client/sbin/dingo-fuse"
 	cacheDirPrefix = "/curvefs/client/data/cache/"
 	PodMountBase   = "/dfs"
 	MountBase      = "/var/lib/dfs"
@@ -176,8 +176,14 @@ func (ct *curvefsTool) CheckFsExisted(fsName string, mdsAddr string) (bool, erro
 
 	// Parse the command output
 	lines := strings.Split(string(fsInfos), "\n")
+	// print lines for debug
+	if len(lines) < 3 {
+		return false, nil
+	}
 	var fsInfoList []FsInfo
+	fmt.Println("print 'dingo list fs' result:")
 	for _, line := range lines {
+		fmt.Println(line)
 		if strings.HasPrefix(line, "+") || strings.HasPrefix(line, "| ID") || line == "" {
 			continue
 		}
