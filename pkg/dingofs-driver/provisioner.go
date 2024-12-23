@@ -156,7 +156,7 @@ func (p *provisionerService) Provision(ctx context.Context, options provisioncon
 					Driver:           config.DriverName,
 					VolumeHandle:     pvName,
 					ReadOnly:         false,
-					FSType:           "juicefs",
+					FSType:           "dingofs",
 					VolumeAttributes: volCtx,
 					NodePublishSecretRef: &corev1.SecretReference{
 						Name:      scParams[config.PublishSecretName],

@@ -1,18 +1,26 @@
-# Curvefs CSI Driver
+# DingoFS CSI Driver
 
 ## Introduction
 
-The Curvefs CSI Driver implements the CSI specification for container orchestrators to manager Curvefs File Systems.
+The DingoFS CSI Driver implements the CSI specification for container orchestrators to manager DingoFS File Systems.
 
 ## Prerequisites
 
 - Kubernetes 1.18+
+
+## Build
+```shell
+make csi
+CSI_IMAGE_NAME=<IMAGE_NAME> DRIVER_VERSION=<IMAGE_TAG> make docker-build
+CSI_IMAGE_NAME=<IMAGE_NAME> DRIVER_VERSION=<IMAGE_TAG> make docker-push
+```
 
 ## CSI Interface Implemented
 
 - ControllerServer: CreateVolume, DeleteVolume, ValidateVolumeCapabilities
 - NodeServer: NodePublishVolume, NodeUnpublishVolume, NodeGetInfo, NodeGetCapabilities
 - IdentityServer: GetPluginInfo, Probe, GetPluginCapabilities
+- Provisioner: Responsible for dynamically provisioning and deprovisioning storage resources. 
 
 ## How to use
 
@@ -59,21 +67,8 @@ you may lose this part of data. Remount will crash, because you only have meta b
 
 ## Build Status
 
-| Curvefs CSI Driver Version | Curvefs Version | Curvefs CSI Driver Image                          |
+| DingoFS CSI Driver Version | DingoFS Version | DingoFS CSI Driver Image                          |
 |----------------------------|-----------------|---------------------------------------------------|
-| v1.0.0                     | v2.3.0-rc0      | curvecsi/curvefscsi:v1.0.0 |
-| v1.0.1 | v2.4.0-beta2 | curvecsi/curvefscsi:v1.0.1|
-| v1.0.2 | v2.5.0-beta | curvecsi/curvefscsi:v1.0.2| 
-
-## Inherited on the cloud platform
-
-- KubeSphere: https://www.kubesphere.io/zh/blogs/kubesphere-curve/
-- Rainbond: https://www.rainbond.com/blog/curve/
-
-## Follow-up Work
-
-- more create/mount options support (require future curvefs support)
-- move sensitive info like s3 ak/sk to secret
-- subpath mount support (require future curvefs support)
-- move every mount into a seperate pod, inspired by dingofs-csi
-- quota(bytes) support (require future curvefs support)
+| v1.0.0                     | v2.3.0-rc0      | dingodatabase/dingofs-csi:v1.0.0 |
+| v1.1 | v2.4.0-beta2 | dingodatabase/dingofs-csi:v1.1|
+| v2.1 | v2.5.0-beta | dingodatabase/dingofs-csi:v2.1|
