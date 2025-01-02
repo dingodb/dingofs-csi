@@ -1,0 +1,167 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app.kubernetes.io/component: node
+    app.kubernetes.io/instance: dingofs-csi-driver
+    app.kubernetes.io/name: dingofs-csi-driver
+    app.kubernetes.io/version: master
+  name: dingofs-csi-node
+  namespace: dingofs
+spec:
+  selector:
+    matchLabels:
+      app: dingofs-csi-node
+      app.kubernetes.io/instance: dingofs-csi-driver
+      app.kubernetes.io/name: dingofs-csi-driver
+      app.kubernetes.io/version: master
+  template:
+    metadata:
+      labels:
+        app: dingofs-csi-node
+        app.kubernetes.io/instance: dingofs-csi-driver
+        app.kubernetes.io/name: dingofs-csi-driver
+        app.kubernetes.io/version: master
+    spec:
+      containers:
+      - args:
+        - --endpoint=$(CSI_ENDPOINT)
+        - --logtostderr
+        - --nodeid=$(NODE_NAME)
+        - --enable-manager=true
+        env:
+        - name: CSI_ENDPOINT
+          value: unix:/csi/csi.sock
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: DINGOFS_MOUNT_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: KUBELET_PORT
+          value: "10250"
+        - name: DINGOFS_MOUNT_PATH
+          value: /var/lib/dingofs/volume
+        - name: DINGOFS_CONFIG_PATH
+          value: /var/lib/dingofs/config
+        - name: DINGOFS_MOUNT_IMAGE # mount pod image
+          value: harbor.zetyun.cn/dingofs/dingofs-csi:v2.1-alpha
+        image: harbor.zetyun.cn/dingofs/dingofs-csi:v2.1-alpha
+        livenessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /healthz
+            port: healthz
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+        name: dingofs-plugin
+        ports:
+        - containerPort: 9909
+          name: healthz
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 100m
+            memory: 512Mi
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - mountPath: /var/lib/kubelet
+          mountPropagation: Bidirectional
+          name: kubelet-dir
+        - mountPath: /csi
+          name: plugin-dir
+        - mountPath: /dev
+          name: device-dir
+        - mountPath: /dfs
+          mountPropagation: Bidirectional
+          name: dfs-dir
+        - mountPath: /root/.dingofs
+          mountPropagation: Bidirectional
+          name: dfs-root-dir
+        - mountPath: /etc/config
+          name: dingofs-config
+        - mountPath: /tmp
+          name: dfs-fuse-fd
+      - args:
+        - --csi-address=$(ADDRESS)
+        - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
+        - --v=5
+        env:
+        - name: ADDRESS
+          value: /csi/csi.sock
+        - name: DRIVER_REG_SOCK_PATH
+          value: /var/lib/kubelet/csi-plugins/csi.dingofs.com/csi.sock
+        image: harbor.zetyun.cn/dingofs/sig-storage/csi-node-driver-registrar:v2.9.0
+        name: node-driver-registrar
+        volumeMounts:
+        - mountPath: /csi
+          name: plugin-dir
+        - mountPath: /registration
+          name: registration-dir
+      - args:
+        - --csi-address=$(ADDRESS)
+        - --health-port=$(HEALTH_PORT)
+        env:
+        - name: ADDRESS
+          value: /csi/csi.sock
+        - name: HEALTH_PORT
+          value: "9909"
+        image: harbor.zetyun.cn/dingofs/sig-storage/livenessprobe:v2.11.0
+        name: liveness-probe
+        volumeMounts:
+        - mountPath: /csi
+          name: plugin-dir
+      dnsPolicy: ClusterFirstWithHostNet
+      priorityClassName: system-node-critical
+      serviceAccount: dingofs-csi-node-sa
+      tolerations:
+      - key: CriticalAddonsOnly
+        operator: Exists
+      volumes:
+      - hostPath:
+          path: /var/lib/kubelet
+          type: Directory
+        name: kubelet-dir
+      - hostPath:
+          path: /var/lib/kubelet/csi-plugins/csi.dingofs.com/
+          type: DirectoryOrCreate
+        name: plugin-dir
+      - hostPath:
+          path: /var/lib/kubelet/plugins_registry/
+          type: Directory
+        name: registration-dir
+      - hostPath:
+          path: /dev
+          type: Directory
+        name: device-dir
+      - hostPath:
+          path: /var/lib/dingofs/volume
+          type: DirectoryOrCreate
+        name: dfs-dir
+      - hostPath:
+          path: /var/lib/dingofs/config
+          type: DirectoryOrCreate
+        name: dfs-root-dir
+      - configMap:
+          defaultMode: 420
+          name: dingofs-csi-driver-config
+        name: dingofs-config
+      - hostPath:
+          path: /var/run/dingofs-csi
+          type: DirectoryOrCreate
+        name: dfs-fuse-fd
