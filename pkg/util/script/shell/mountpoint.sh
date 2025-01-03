@@ -9,7 +9,7 @@ g_quota_capacity="--capacity="
 g_quota_inodes="--inodes="
 g_entrypoint="/entrypoint.sh"
 # Path to the client.conf file
-CONFIG_FILE="/curvefs/conf/client.conf"
+CONFIG_FILE="/dingofs/conf/client.conf"
 
 function updateFuseConfig() {
     # Read the configuration file line by line

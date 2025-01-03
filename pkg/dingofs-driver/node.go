@@ -131,15 +131,15 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	// mound pod to mounting dingofs. e.g
 	// /usr/local/bin/dingofs redis://:xxx /dfs/pvc-7175fc74-d52d-46bc-94b3-ad9296b726cd-alypal -o metrics=0.0.0.0:9567
-	// /curvefs/client/sbin/dingo-fuse \
+	// /dingofs/client/sbin/dingo-fuse \
 	// -f \
 	// -o default_permissions \
 	// -o allow_other \
 	// -o fsname=test \
 	// -o fstype=s3 \
 	// -o user=curvefs \
-	// -o conf=/curvefs/client/conf/client.conf \
-	// /curvefs/client/mnt/mnt/mp-1
+	// -o conf=/dingofs/client/conf/client.conf \
+	// /dingofs/client/mnt/mnt/mp-1
 	log.Info("mounting dingofs", "secret", reflect.ValueOf(secrets).MapKeys(), "options", mountOptions)
 	dfs, err := d.provider.DfsMount(ctx, volumeID, target, secrets, volCtx, mountOptions)
 	if err != nil {

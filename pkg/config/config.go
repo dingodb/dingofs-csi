@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	DriverName               = "csi.dingofs.v2"
+	DriverName               = "csi.dingofs.com"
 	NodeName                 = ""
 	Namespace                = ""
 	PodName                  = ""
@@ -28,9 +28,9 @@ var (
 	DFSMountPriorityName     = "system-node-critical"
 	DFSMountPreemptionPolicy = ""
 
-	// DefaultMountImage = "dingodatabase/dingofs-csi:latest" // mount pod image, override by ENV
-	DefaultMountImage = "harbor.zetyun.cn/dingofs/dingofs-csi:v2.1-alpha" // TODO upgrade image version
-	MountPointPath    = "/var/lib/dingofs/volume"
+	DefaultMountImage = "dingodatabase/dingofs-csi:latest" // mount pod image, override by ENV
+	// DefaultMountImage = "harbor.zetyun.cn/dingofs/dingofs-csi:latest" // TODO upgrade image version
+	MountPointPath = "/var/lib/dingofs/volume"
 
 	FORMAT_FUSE_ARGS = []string{
 		"-f",
@@ -106,9 +106,9 @@ const (
 
 	DefaultBootstrapPath  = "/scripts"
 	DefaultBootstrapShell = "mountpoint.sh"
-	DefaultClientConfPath = "/curvefs/conf/client.conf"
+	DefaultClientConfPath = "/dingofs/conf/client.conf"
 	DfsCMDPath            = "/usr/bin/dingo"
-	DfsFuseCMDPath        = "/curvefs/client/sbin/dingo-fuse"
+	DfsFuseCMDPath        = "/dingofs/client/sbin/dingo-fuse"
 
 	TmpPodMountBase = "/tmp"
 

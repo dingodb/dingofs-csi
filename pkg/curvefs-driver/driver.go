@@ -36,7 +36,7 @@ type CurvefsDriver struct {
 	endpoint string
 }
 
-// NewDriver create a new curvefs driver
+// NewDriver create a new dingofs driver
 func NewDriver(endpoint string, nodeID string) (*CurvefsDriver, error) {
 	csiDriver := csicommon.NewCSIDriver(DriverName, util.GetVersion(), nodeID)
 	csiDriver.AddControllerServiceCapabilities(

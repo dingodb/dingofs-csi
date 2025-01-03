@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Juicedata Inc
+ Copyright 2022 Juicedata Inc
  Copyright 2024 Dingodb.com
 
 Licensed under the Apache License, Version 2.0 (the "License");

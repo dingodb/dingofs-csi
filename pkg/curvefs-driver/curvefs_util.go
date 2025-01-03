@@ -32,12 +32,12 @@ import (
 )
 
 const (
-	defaultToolExampleConfPath   = "/curvefs/conf/tools.conf"
-	defaultClientExampleConfPath = "/curvefs/conf/client.conf"
-	// toolPath                     = "/curvefs/tools/sbin/curvefs_tool"
-	toolPath       = "/curvefs/tools-v2/sbin/dingo"
-	clientPath     = "/curvefs/client/sbin/dingo-fuse"
-	cacheDirPrefix = "/curvefs/client/data/cache/"
+	defaultToolExampleConfPath   = "/dingofs/conf/tools.conf"
+	defaultClientExampleConfPath = "/dingofs/conf/client.conf"
+	// toolPath                     = "/dingofs/tools/sbin/dingofs_tool"
+	toolPath       = "/dingofs/tools-v2/sbin/dingo"
+	clientPath     = "/dingofs/client/sbin/dingo-fuse"
+	cacheDirPrefix = "/dingofs/client/data/cache/"
 	PodMountBase   = "/dfs"
 	MountBase      = "/var/lib/dfs"
 )
@@ -393,7 +393,7 @@ func (cm *curvefsMounter) MountFs(
 
 	cm.mounterParams["fsname"] = fsname
 	// curve-fuse -o default_permissions -o allow_other \
-	//  -o conf=/etc/curvefs/client.conf -o fsname=testfs \
+	//  -o conf=/etc/dingofs/client.conf -o fsname=testfs \
 	//  -o fstype=s3  --mdsAddr=1.1.1.1 <mountpoint>
 	var mountFsArgs []string
 	doubleDashArgs := map[string]string{"mdsaddr": ""}

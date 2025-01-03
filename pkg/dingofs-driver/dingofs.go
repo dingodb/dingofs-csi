@@ -594,7 +594,7 @@ func (d *dingofs) CreateFS(
 	secrets map[string]string,
 ) error {
 	if secrets["storage"] == "" || secrets["bucket"] == "" {
-		klog.Info("DfsMount: storage or bucket is emptyd")
+		klog.Info("DfsMount: storage or bucket is empty")
 	}
 	fsName := secrets["name"]
 	//if _, ok := fss[fsName]; ok {
