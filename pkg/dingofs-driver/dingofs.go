@@ -193,6 +193,7 @@ func (d *dingofs) InitDfs(ctx context.Context, volumeID string, target string, s
 	// alway create fs when init setting, because we should ensure fs's config alway up-to-date
 	err = d.CreateFS(secrets)
 	if err != nil {
+		klog.ErrorS(err, "dingofs create fs error")
 		return nil, fmt.Errorf("dingofs create fs error: %v", err)
 	}
 
@@ -593,8 +594,8 @@ func (d *dingofs) AuthFs(ctx context.Context, secrets map[string]string, setting
 func (d *dingofs) CreateFS(
 	secrets map[string]string,
 ) error {
-	if secrets["storage"] == "" || secrets["bucket"] == "" {
-		klog.Info("DfsMount: storage or bucket is empty")
+	if secrets["s3Bucket"] == "" {
+		klog.Info("DfsMount: bucket is empty")
 	}
 	fsName := secrets["name"]
 	//if _, ok := fss[fsName]; ok {
@@ -629,9 +630,10 @@ func (d *dingofs) CreateFS(
 		createFsArgs = append(createFsArgs, arg)
 	}
 
-	klog.V(1).Infof("create fs, createFsArgs: %v", createFsArgs)
+	klog.Infof("create fs, createFsArgs: %v", createFsArgs)
 	createFsCmd := exec.Command(config.DfsCMDPath, createFsArgs...) //
 	output, err := createFsCmd.CombinedOutput()
+	klog.Infof("create fs, output: %s", output)
 	if err != nil {
 		return status.Errorf(
 			codes.Internal,
@@ -649,7 +651,7 @@ func (d *dingofs) CreateFS(
 			arg := fmt.Sprintf("--%s=%s", k, v)
 			configQuotaArgs = append(configQuotaArgs, arg)
 		}
-		klog.V(1).Infof("config fs, configQuotaArgs: %v", configQuotaArgs)
+		klog.Infof("config fs, configQuotaArgs: %v", configQuotaArgs)
 		configQuotaCmd := exec.Command(config.DfsCMDPath, configQuotaArgs...)
 		outputQuota, errQuota := configQuotaCmd.CombinedOutput()
 		if errQuota != nil {

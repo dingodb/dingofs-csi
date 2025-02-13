@@ -129,10 +129,10 @@ func (k *K8sClient) CreatePod(ctx context.Context, pod *corev1.Pod) (*corev1.Pod
 }
 
 func (k *K8sClient) GetPod(ctx context.Context, podName, namespace string) (*corev1.Pod, error) {
-	clientLog.V(1).Info("Get pod", "name", podName)
+	clientLog.Info("Get pod", "name", podName)
 	mntPod, err := k.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
-		clientLog.V(1).Info("Can't get pod", "name", podName, "namespace", namespace, "error", err)
+		clientLog.Info("Can't get pod", "name", podName, "namespace", namespace, "error", err)
 		return nil, err
 	}
 	return mntPod, nil

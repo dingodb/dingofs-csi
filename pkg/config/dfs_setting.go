@@ -485,6 +485,7 @@ func ApplyConfigPatch(setting *DfsSetting) {
 	if setting.MountOptions == nil {
 		setting.MountOptions = make([]string, 0)
 	}
+	klog.Info("setting.MountOptions", setting.MountOptions, "patch.MountOptions", patch.MountOptions)
 	for _, option := range patch.MountOptions {
 		for i, o := range setting.MountOptions {
 			if strings.Split(o, "=")[0] == option {
@@ -493,6 +494,7 @@ func ApplyConfigPatch(setting *DfsSetting) {
 		}
 		setting.MountOptions = append(setting.MountOptions, option)
 	}
+	klog.Info("merged fsetting.MountOptions", setting.MountOptions)
 }
 
 // GenMountPodPatch generate mount pod patch from dfsSettting

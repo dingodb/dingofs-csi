@@ -218,7 +218,7 @@ func WaitUtilMountReady(ctx context.Context, podName, mntPath string, timeout ti
 	waitCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	// Wait until the mount point is ready
-	klog.Info("waiting for mount point ready", "podName", podName)
+	klog.Infof("schedule check mount pod [%s] ready", podName)
 	for {
 		var finfo os.FileInfo
 		if err := util.DoWithTimeout(waitCtx, timeout, func() (err error) {
@@ -237,7 +237,7 @@ func WaitUtilMountReady(ctx context.Context, podName, mntPath string, timeout ti
 			if st.Ino == 1 {
 				dev = uint64(st.Dev)
 				util.DevMinorTableStore(mntPath, dev)
-				klog.Info("Mount point is ready", "podName", podName)
+				klog.Infof("Mount point is ready, podName [%s]", podName)
 				return nil
 			}
 			klog.V(1).Info("Mount point is not ready, wait for it", "podName", podName)
@@ -295,20 +295,34 @@ func GetMountPathOfPod(pod corev1.Pod) (string, string, error) {
 
 // parseMntPath return mntPath, volumeId (/dfs/volumeId, volumeId err)
 func parseMntPath(cmd string) (string, string, error) {
+	// klog.Info("parse mnt path cmd:", cmd) // /scripts/mountpoint.sh dw-fs-1 s3 --role=client --args='-f -o default_permissions -o allow_other -o fsname=dw-fs-1 -o fstype=s3 -o user=dingofs -o conf=/dingofs/conf/client.conf /dfs/test-pv-ceph-2-kafthg'
 	cmds := strings.Split(cmd, "\n")
 	mountCmd := cmds[len(cmds)-1]
 	args := strings.Fields(mountCmd)
+	if len(args) == 0 {
+		return "", "", fmt.Errorf("invalid command: %s", cmd)
+	}
 	if args[0] == "exec" {
 		args = args[1:]
 	}
-	if len(args) < 3 || !strings.HasPrefix(args[2], config.PodMountBase) {
-		return "", "", fmt.Errorf("err cmd:%s", cmd)
+	// klog.Info("args[2]:", args[2])
+	// if len(args) < 3 || !strings.HasPrefix(args[2], config.PodMountBase) {
+	// 	return "", "", fmt.Errorf("err cmd:%s", cmd)
+	// }
+
+	// Take the last argument as the mount path
+	mountArg := args[len(args)-1]
+	mountArg = strings.Trim(mountArg, "'")
+	if !strings.HasPrefix(mountArg, config.PodMountBase) {
+		return "", "", fmt.Errorf("invalid mountArg:%s", mountArg)
 	}
-	argSlice := strings.Split(args[2], "/")
-	if len(argSlice) < 3 {
+
+	parts := strings.Split(mountArg, "/")
+	if len(parts) < 3 {
 		return "", "", fmt.Errorf("err mntPath:%s", args[2])
 	}
-	return args[2], argSlice[2], nil
+	klog.Infof("mntPath:%s, volumeId: %s", mountArg, parts[2])
+	return mountArg, parts[2], nil
 }
 
 func GetPVWithVolumeHandleOrAppInfo(ctx context.Context, client *k8s.K8sClient, volumeHandle string, volCtx map[string]string) (*corev1.PersistentVolume, *corev1.PersistentVolumeClaim, error) {

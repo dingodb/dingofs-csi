@@ -79,11 +79,13 @@ func (ct *curvefsTool) CreateFs(
 	if err != nil {
 		return err
 	}
+
 	if fsExisted {
 		klog.Infof("file system: %s has beed already created", fsName)
 		return nil
 	}
 
+	klog.Infof("check fs [%s] not existed, begin create fs [%s]", fsName, fsName)
 	err = ct.ValidateCreateFsParamsV2(secrets)
 	if err != nil {
 		return err
@@ -96,15 +98,32 @@ func (ct *curvefsTool) CreateFs(
 		createFsArgs = append(createFsArgs, arg)
 	}
 
-	klog.V(1).Infof("create fs, createFsArgs: %v", createFsArgs)
 	createFsCmd := exec.Command(toolPath, createFsArgs...) //
 	output, err := createFsCmd.CombinedOutput()
+	klog.Infof("'create fs' command use createFsArgs: %v, output: %s", createFsArgs, output)
 	if err != nil {
 		return status.Errorf(
 			codes.Internal,
-			"curve create fs failed. cmd: %s %v, output: %s, err: %v",
+			"dingo create fs failed. cmd: %s %v, output: %s, err: %v",
 			toolPath,
 			createFsArgs,
+			output,
+			err,
+		)
+	}
+
+	// verify fs created success or not by "query fs in dingofs by fsname or fsid"
+	queryFsArgs := []string{"query", "fs", "--fsname=" + fsName, "--mdsaddr=" + ct.ToolParams["mdsaddr"]}
+	queryFsCmd := exec.Command(toolPath, queryFsArgs...)
+	output, err = queryFsCmd.CombinedOutput()
+	klog.Infof("'query fs' command use queryFsArgs: %v, output: %s", queryFsArgs, output)
+	// check output have 'Error' or not
+	if err != nil || strings.Contains(string(output), "Error") {
+		return status.Errorf(
+			codes.Internal,
+			"dingo query fs failed. cmd: %s %v, output: %s, err: %v",
+			toolPath,
+			queryFsArgs,
 			output,
 			err,
 		)
@@ -116,7 +135,7 @@ func (ct *curvefsTool) CreateFs(
 			arg := fmt.Sprintf("--%s=%s", k, v)
 			configQuotaArgs = append(configQuotaArgs, arg)
 		}
-		klog.V(1).Infof("config fs, configQuotaArgs: %v", configQuotaArgs)
+		klog.Infof("config fs, configQuotaArgs: %v", configQuotaArgs)
 		configQuotaCmd := exec.Command(toolPath, configQuotaArgs...)
 		outputQuota, errQuota := configQuotaCmd.CombinedOutput()
 		if errQuota != nil {
@@ -181,7 +200,7 @@ func (ct *curvefsTool) CheckFsExisted(fsName string, mdsAddr string) (bool, erro
 		return false, nil
 	}
 	var fsInfoList []FsInfo
-	fmt.Println("print 'dingo list fs' result:")
+	fmt.Println("check current fs used by 'dingo list fs' command")
 	for _, line := range lines {
 		fmt.Println(line)
 		if strings.HasPrefix(line, "+") || strings.HasPrefix(line, "| ID") || line == "" {

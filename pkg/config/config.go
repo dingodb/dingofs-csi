@@ -29,8 +29,7 @@ var (
 	DFSMountPreemptionPolicy = ""
 
 	DefaultMountImage = "dingodatabase/dingofs-csi:latest" // mount pod image, override by ENV
-	// DefaultMountImage = "harbor.zetyun.cn/dingofs/dingofs-csi:latest" // TODO upgrade image version
-	MountPointPath = "/var/lib/dingofs/volume"
+	MountPointPath    = "/var/lib/dingofs/volume"
 
 	FORMAT_FUSE_ARGS = []string{
 		"-f",
@@ -38,7 +37,7 @@ var (
 		"-o allow_other",
 		"-o fsname=%s", // fsname
 		"-o fstype=%s", // fstype, `s3` or `volume`
-		"-o user=curvefs",
+		"-o user=dingofs",
 		"-o conf=%s", // config path
 		"%s",         // mount path
 	}
