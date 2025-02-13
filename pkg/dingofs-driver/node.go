@@ -78,6 +78,8 @@ func (d *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 // NodePublishVolume is called by the CO when a workload that wants to use the specified volume is placed (scheduled) on a node
 func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	volCtx := req.GetVolumeContext()
+	klog.Infof("get volume context, volCtx:%#v", volCtx)
+
 	log := klog.NewKlogr().WithName("NodePublishVolume")
 	if volCtx != nil && volCtx[config.PodInfoName] != "" {
 		log = log.WithValues("appName", volCtx[config.PodInfoName])
@@ -114,17 +116,19 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	if req.GetReadonly() || req.VolumeCapability.AccessMode.GetMode() == csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY {
 		options = append(options, "ro")
 	}
+
+	// get mountOptions from PV.spec.mountOptions or StorageClass.mountOptions
 	if m := volCap.GetMount(); m != nil {
-		// get mountOptions from PV.spec.mountOptions or StorageClass.mountOptions
+		klog.Infof("volCap.getMount result:%#v", m)
 		options = append(options, m.MountFlags...)
 	}
-	klog.Infof("get volume context, volCtx:%#v", volCtx)
 
 	secrets := req.Secrets
 
 	// get mountOptions from PV.volumeAttributes or StorageClass.parameters
 	mountOptions := []string{}
 	if opts, ok := volCtx["mountOptions"]; ok {
+		klog.Infof("get mountOptions from StorageClass.parameters, mountOptions:%s", opts)
 		mountOptions = strings.Split(opts, ",")
 	}
 	mountOptions = append(mountOptions, options...)

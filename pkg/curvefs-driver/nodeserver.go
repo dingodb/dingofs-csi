@@ -45,7 +45,7 @@ func (ns *nodeServer) NodePublishVolume(
 ) (*csi.NodePublishVolumeResponse, error) {
 	mountUUID := uuid.New().String()
 	volumeContext := req.GetVolumeContext()
-	klog.V(5).Infof("%s: called with args %+v", util.GetCurrentFuncName(), *req)
+	klog.Infof("%s: called with args %+v", util.GetCurrentFuncName(), *req)
 	volumeID := req.GetVolumeId()
 	targetPath := req.GetTargetPath()
 	if len(targetPath) == 0 {

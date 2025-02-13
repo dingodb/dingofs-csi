@@ -556,8 +556,6 @@ func (p *PodDriver) podReadyHandler(ctx context.Context, pod *corev1.Pod) (Resul
 			return nil
 		})
 		return Result{RequeueImmediately: true}, p.Client.DeletePod(ctx, pod)
-		log.Error(err, "pod is err, don't do recovery")
-		return Result{}, err
 	}
 
 	return Result{}, p.recover(ctx, pod, mntPath)
