@@ -57,7 +57,7 @@ func (r *BaseBuilder) genPodTemplate(baseCnGen func() corev1.Container) *corev1.
 			Namespace: r.dfsSetting.Attr.Namespace,
 			Labels: map[string]string{
 				config.PodTypeKey:          config.PodTypeValue,
-				config.PodUniqueIdLabelKey: r.dfsSetting.UniqueId,
+				config.PodVolumeIdLabelKey: r.dfsSetting.UniqueId,
 			},
 			Annotations: make(map[string]string),
 		},
@@ -256,7 +256,7 @@ func (r *BaseBuilder) genMetricsPort() int32 {
 func (r *BaseBuilder) _genMetadata() (labels map[string]string, annotations map[string]string) {
 	labels = map[string]string{
 		config.PodTypeKey:          config.PodTypeValue,
-		config.PodUniqueIdLabelKey: r.dfsSetting.UniqueId,
+		config.PodVolumeIdLabelKey: r.dfsSetting.UniqueId,
 	}
 	annotations = map[string]string{}
 

@@ -19,7 +19,11 @@ package k8sclient
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"io"
+	"math/rand"
+	"net"
 	"net/url"
 	"os"
 	"strconv"
@@ -36,6 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -46,6 +51,11 @@ import (
 
 const (
 	timeout = 10 * time.Second
+	// node port range
+	nodePortMin = 30000
+	nodePortMax = 32767
+
+	defaultMetric = 9000 // mountpod default metric port
 )
 
 var clientLog = klog.NewKlogr().WithName("k8s client")
@@ -119,13 +129,62 @@ func (k *K8sClient) CreatePod(ctx context.Context, pod *corev1.Pod) (*corev1.Pod
 		clientLog.Info("Create pod: pod is nil")
 		return nil, nil
 	}
-	clientLog.V(1).Info("Create pod", "name", pod.Name)
+	clientLog.Info("Create pod", "name", pod.Name)
 	mntPod, err := k.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
 		clientLog.Info("Can't create pod", "name", pod.Name, "error", err)
 		return nil, err
 	}
+
+	// expose mountpod metric port to host by NodePort
+	// Generate base NodePort
+	basePort := generateNodePort(pod.Name)
+
+	// Find an available NodePort
+	metricPort := findAvailableNodePort(basePort)
+	klog.Infof("Allocated metric NodePort for pod %s: %d\n", pod.Name, metricPort)
+	// Create service for mountpod
+	_, err = k.createSerivce(ctx, pod.Namespace, pod.Name, metricPort)
+	if err != nil {
+		clientLog.Info("Can't create service for mountpod", "name", pod.Name, "error", err)
+		// return nil, err
+	}
 	return mntPod, nil
+}
+
+// createService create service for mountpod
+func (k *K8sClient) createSerivce(ctx context.Context, namespace string, podName string, metricPort int) (*corev1.Service, error) {
+	volInfo := podName[len(podName)-47:] // <volumeId>-<random-6-digit>: pvc-cc5cb2f5-e6fb-4a31-9476-6d16dedbc607-foogee
+	// Define the Service
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-metrics", volInfo),
+			Namespace: namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeNodePort,
+			Ports: []corev1.ServicePort{
+				{
+					Port:       defaultMetric,                 // Internal pod port
+					TargetPort: intstr.FromInt(defaultMetric), // Target container port
+					NodePort:   int32(metricPort),             // Assigned NodePort
+					Protocol:   corev1.ProtocolTCP,
+				},
+			},
+			Selector: map[string]string{
+				"pod-uniqueid": podName[len(podName)-6:], // Match pod label
+			},
+		},
+	}
+
+	// Create the Service in Kubernetes
+	s, err := k.CoreV1().Services(namespace).Create(ctx, service, metav1.CreateOptions{})
+	if err != nil {
+		clientLog.Info("Can't create service", "name", service.Name, "error", err)
+		return nil, err
+	}
+	klog.Infof("Service %s created successfully with NodePort %d\n", service.Name, metricPort)
+	return s, nil
 }
 
 func (k *K8sClient) GetPod(ctx context.Context, podName, namespace string) (*corev1.Pod, error) {
@@ -472,4 +531,43 @@ func execute(method string, url *url.URL, config *restclient.Config, stdin io.Re
 		Stderr: stderr,
 		Tty:    tty,
 	})
+}
+
+// Generates a deterministic NodePort based on pod name
+func generateNodePort(podName string) int {
+	hash := sha256.Sum256([]byte(podName))
+	port := int(hash[0])<<8 + int(hash[1])
+	port = nodePortMin + (port % (nodePortMax - nodePortMin))
+	return port
+}
+
+// Checks if a port is available on the host machine
+func isPortAvailable(port int) bool {
+	addr := fmt.Sprintf(":%d", port)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return false // Port is occupied
+	}
+	listener.Close()
+	return true
+}
+
+// Finds an available NodePort
+func findAvailableNodePort(basePort int) int {
+	// First try the generated port
+	if isPortAvailable(basePort) {
+		return basePort
+	}
+
+	// If it's occupied, try random ports in the range
+	r := rand.New(rand.NewSource(time.Now().UnixNano())) // Create a new rand instance
+	for i := 0; i < 100; i++ {                           // Limit retries to 100 attempts
+		port := nodePortMin + r.Intn(nodePortMax-nodePortMin)
+		if isPortAvailable(port) {
+			return port
+		}
+	}
+
+	klog.Fatalf("Failed to find an available NodePort after 100 attempts")
+	return 0
 }

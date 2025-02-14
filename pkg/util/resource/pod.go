@@ -393,7 +393,7 @@ func GetErrContainerLog(ctx context.Context, client *k8s.K8sClient, podName stri
 func GenMountPodName(ctx context.Context, client *k8sclient.K8sClient, dfsSetting *config.DfsSetting) (string, error) {
 	labelSelector := &metav1.LabelSelector{MatchLabels: map[string]string{
 		config.PodTypeKey:          config.PodTypeValue,
-		config.PodUniqueIdLabelKey: dfsSetting.UniqueId,
+		config.PodVolumeIdLabelKey: dfsSetting.UniqueId,
 		config.PodHashLabelKey:     dfsSetting.HashVal,
 	}}
 	klog.Info("pod selector label", labelSelector)

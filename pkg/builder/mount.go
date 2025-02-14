@@ -159,6 +159,9 @@ func (p *PodMount) createPodOrAddRef(ctx context.Context, podName string, dfsSet
 				}
 				newPod.Annotations[key] = dfsSetting.TargetPath
 				newPod.Labels[config.PodHashLabelKey] = dfsSetting.HashVal
+				// extract last 6 char of podName as uniqueId which is generate by random,
+				// e.g. ingofs-sd-shangdi-ceph17-pvc-cc5cb2f5-e6fb-4a31-9476-6d16dedbc607-foogee extract foogee
+				newPod.Labels[config.PodUniqueIdLabelKey] = podName[len(podName)-6:]
 
 				nodeSelector := map[string]string{
 					"kubernetes.io/hostname": newPod.Spec.NodeName,

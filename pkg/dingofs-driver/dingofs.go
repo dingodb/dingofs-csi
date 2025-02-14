@@ -343,6 +343,7 @@ func (d *dingofs) CreateTarget(ctx context.Context, target string) error {
 }
 
 func (d *dingofs) SetQuota(ctx context.Context, secrets map[string]string, dfsSetting *config.DfsSetting, quotaPath string, capacity int64) error {
+	// TODO modify below logic
 	cap := capacity / 1024 / 1024 / 1024
 	if cap <= 0 {
 		return fmt.Errorf("capacity %d is too small, at least 1GiB for quota", capacity)
@@ -428,7 +429,7 @@ func (d *dingofs) DfsUnmount(ctx context.Context, volumeId, mountPath string) er
 	// get pod by label
 	labelSelector := &metav1.LabelSelector{MatchLabels: map[string]string{
 		config.PodTypeKey:          config.PodTypeValue,
-		config.PodUniqueIdLabelKey: uniqueId,
+		config.PodVolumeIdLabelKey: uniqueId,
 	}}
 	fieldSelector := &fields.Set{"spec.nodeName": config.NodeName}
 	pods, err := d.K8sClient.ListPod(ctx, config.Namespace, labelSelector, fieldSelector)

@@ -50,8 +50,9 @@ const (
 	PodTypeValue        = "dingofs-mount"
 	JobTypeKey          = "batch.kubernetes.io/name"
 	JobTypeValue        = "dingofs-job"
-	PodUniqueIdLabelKey = "volume-id"
+	PodVolumeIdLabelKey = "volume-id"
 	PodHashLabelKey     = "dingofs-hash"
+	PodUniqueIdLabelKey = "pod-uniqueid"
 
 	DingoFSID = "dingfs-fsid"
 	UniqueId  = "dingofs-uniqueid"
