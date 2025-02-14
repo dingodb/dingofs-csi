@@ -18,16 +18,13 @@ package dingofsdriver
 
 import (
 	"context"
-	"path"
 	"reflect"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
 	k8sexec "k8s.io/utils/exec"
 	"k8s.io/utils/mount"
@@ -159,36 +156,37 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Errorf(codes.Internal, "Could not bind %q at %q: %v", bindSource, target, err)
 	}
 
-	if cap, exist := volCtx["capacity"]; exist {
-		capacity, err := strconv.ParseInt(cap, 10, 64)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "invalid capacity %s: %v", cap, err)
-		}
-		settings := dfs.GetSetting()
-		if settings.PV != nil {
-			capacity = settings.PV.Spec.Capacity.Storage().Value()
-		}
-		quotaPath := settings.SubPath
-		var subdir string
-		for _, o := range settings.MountOptions {
-			pair := strings.Split(o, "=")
-			if len(pair) != 2 {
-				continue
-			}
-			if pair[0] == "subdir" {
-				subdir = path.Join("/", pair[1])
-			}
-		}
+	// below code which is used to set quota is implemented in CreateFS
+	//if cap, exist := volCtx["capacity"]; exist {
+	//	capacity, err := strconv.ParseInt(cap, 10, 64)
+	//	if err != nil {
+	//		return nil, status.Errorf(codes.Internal, "invalid capacity %s: %v", cap, err)
+	//	}
+	//	settings := dfs.GetSetting()
+	//	if settings.PV != nil {
+	//		capacity = settings.PV.Spec.Capacity.Storage().Value()
+	//	}
+	//	quotaPath := settings.SubPath
+	//	var subdir string
+	//	for _, o := range settings.MountOptions {
+	//		pair := strings.Split(o, "=")
+	//		if len(pair) != 2 {
+	//			continue
+	//		}
+	//		if pair[0] == "subdir" {
+	//			subdir = path.Join("/", pair[1])
+	//		}
+	//	}
 
-		go func() {
-			err := retry.OnError(retry.DefaultRetry, func(err error) bool { return true }, func() error {
-				return d.provider.SetQuota(context.Background(), secrets, settings, path.Join(subdir, quotaPath), capacity)
-			})
-			if err != nil {
-				log.Error(err, "set quota failed")
-			}
-		}()
-	}
+	//	go func() {
+	//		err := retry.OnError(retry.DefaultRetry, func(err error) bool { return true }, func() error {
+	//			return d.provider.SetQuota(context.Background(), secrets, settings, path.Join(subdir, quotaPath), capacity)
+	//		})
+	//		if err != nil {
+	//			log.Error(err, "set quota failed")
+	//		}
+	//	}()
+	//}
 
 	log.Info("dingofs volume mounted", "volumeId", volumeID, "target", target)
 	return &csi.NodePublishVolumeResponse{}, nil
