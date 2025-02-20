@@ -286,6 +286,24 @@ func (r *BaseBuilder) _genDfsVolumes() ([]corev1.Volume, []corev1.VolumeMount) {
 	volumeMounts := []corev1.VolumeMount{}
 	secretName := r.dfsSetting.SecretName
 
+	if config.CSIPod.Spec.Containers[0].VolumeMounts != nil {
+
+		for i, vm := range config.CSIPod.Spec.Containers[0].VolumeMounts {
+			// add volumeMounts name prefix which have 'dingofs-disk'
+			if strings.HasPrefix(vm.Name, "dingofs-disk") {
+				volumeMounts = append(volumeMounts, config.CSIPod.Spec.Containers[0].VolumeMounts[i])
+			}
+		}
+	}
+	if config.CSIPod.Spec.Volumes != nil {
+		for i, v := range config.CSIPod.Spec.Volumes {
+			// add volumes name prefix which have 'dingofs-disk'
+			if strings.HasPrefix(v.Name, "dingofs-disk") {
+				volumes = append(volumes, config.CSIPod.Spec.Volumes[i])
+			}
+		}
+	}
+
 	if r.dfsSetting.EncryptRsaKey != "" {
 		volumes = append(volumes, corev1.Volume{
 			Name: "rsa-key",
