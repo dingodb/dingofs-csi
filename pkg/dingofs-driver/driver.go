@@ -18,6 +18,7 @@ package dingofsdriver
 
 import (
 	"context"
+	"encoding/json"
 	"net"
 	"os"
 	"time"
@@ -145,7 +146,20 @@ func parseNodeConfig() {
 	}
 
 	config.CSIPod = *pod
-
+	// print csi node pod.Spec.Volumes and pod.Spec.Containers[0].VolumeMounts
+	// marshal VolumeMounts to json
+	volumeMountsJSON, err := json.MarshalIndent(pod.Spec.Containers[0].VolumeMounts, "", "  ")
+	if err != nil {
+		klog.ErrorS(err, "Failed to marshal volume mounts to JSON")
+	} else {
+		klog.Infof("csi-driver volume mounts JSON: %s", string(volumeMountsJSON))
+	}
+	volumeJSON, err := json.MarshalIndent(pod.Spec.Volumes, "", "  ")
+	if err != nil {
+		klog.ErrorS(err, "Failed to marshal volumes to JSON")
+	} else {
+		klog.Infof("csi-driver pod volumes JSON: %s", string(volumeJSON))
+	}
 	// err = fuse.InitGlobalFds(context.TODO(), "/tmp")
 	// if err != nil {
 	// 	log.Error(err, "Init global fds error")

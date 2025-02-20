@@ -104,8 +104,14 @@ func (r *PodBuilder) NewMountPod(podName string) (*corev1.Pod, error) {
 	pod.Spec.Volumes = append(pod.Spec.Volumes, volumes...)
 	pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, volumeMounts...)
 
+	klog.Infof("pod volumes: %v", pod.Spec.Volumes)
+	klog.Infof("pod volumeMounts: %v", pod.Spec.Containers[0].VolumeMounts)
+
 	// add cache-dir hostpath & PVC volume
 	cacheVolumes, cacheVolumeMounts := r.genCacheDirVolumes()
+	klog.Infof("cacheVolumes: %v", cacheVolumes)
+	klog.Infof("cacheVolumeMounts: %v", cacheVolumeMounts)
+
 	pod.Spec.Volumes = append(pod.Spec.Volumes, cacheVolumes...)
 	pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, cacheVolumeMounts...)
 
@@ -200,6 +206,7 @@ func (r *PodBuilder) genCacheDirVolumes() ([]corev1.Volume, []corev1.VolumeMount
 
 	hostPathType := corev1.HostPathDirectoryOrCreate
 
+	klog.V(6).Infof("cacheDirs: %v", r.dfsSetting.CacheDirs)
 	for idx, cacheDir := range r.dfsSetting.CacheDirs {
 		name := fmt.Sprintf("cachedir-%d", idx)
 
@@ -221,6 +228,8 @@ func (r *PodBuilder) genCacheDirVolumes() ([]corev1.Volume, []corev1.VolumeMount
 		}
 		cacheVolumeMounts = append(cacheVolumeMounts, volumeMount)
 	}
+
+	klog.V(6).Infof("cacheVolumeMounts: %v", cacheVolumeMounts)
 
 	for i, cache := range r.dfsSetting.CachePVCs {
 		name := fmt.Sprintf("cachedir-pvc-%d", i)

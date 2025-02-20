@@ -668,6 +668,12 @@ func ParseSetting(secrets, volCtx map[string]string, mountOptions []string, pv *
 	return &dfsSetting, nil
 }
 
+//func genCacheDirs(dfsSetting *DfsSetting) error {
+//	// parse cache dirs from config.CSIPod
+//
+//	return nil
+//}
+
 func GenAndValidOptions(dfsSetting *DfsSetting, options []string) error {
 	mountOptions := []string{}
 	for _, option := range options {
