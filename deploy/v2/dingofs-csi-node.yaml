@@ -62,8 +62,8 @@ spec:
         - name: DINGOFS_CONFIG_PATH
           value: /var/lib/dingofs/config
         - name: DINGOFS_MOUNT_IMAGE # mount pod image
-          value: harbor.mas.zetyun.cn/dingofs/dingofs-csi:v2.1
-        image: harbor.mas.zetyun.cn/dingofs/dingofs-csi:v2.1
+          value: harbor.zetyun.cn/dingofs/dingofs-csi:v2.1
+        image: harbor.zetyun.cn/dingofs/dingofs-csi:v2.1
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 5
@@ -126,7 +126,7 @@ spec:
           value: /csi/csi.sock
         - name: DRIVER_REG_SOCK_PATH
           value: /var/lib/kubelet/csi-plugins/csi.dingofs.com/csi.sock
-        image: harbor.mas.zetyun.cn/dingofs/sig-storage/csi-node-driver-registrar:v2.9.0
+        image: harbor.zetyun.cn/dingofs/sig-storage/csi-node-driver-registrar:v2.9.0
         name: node-driver-registrar
         volumeMounts:
         - mountPath: /csi
@@ -141,7 +141,7 @@ spec:
           value: /csi/csi.sock
         - name: HEALTH_PORT
           value: "9909"
-        image: harbor.mas.zetyun.cn/dingofs/sig-storage/livenessprobe:v2.11.0
+        image: harbor.zetyun.cn/dingofs/sig-storage/livenessprobe:v2.11.0
         name: liveness-probe
         volumeMounts:
         - mountPath: /csi
