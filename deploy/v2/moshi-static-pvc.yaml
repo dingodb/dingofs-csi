@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: dingofs-pvc-test-1
+  namespace: dingofs
+  labels:
+    dc.com/osm.jspolicy.verify: "false"
+  annotations:
+    dingofs/mount-cpu-request: 500m
+    dingofs/mount-cpu-limit: "1"
+    dingofs/mount-memory-request: 50Gi
+    dingofs/mount-memory-limit: 60Gi
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Ti
+  storageClassName: dingofs-sc-test-1
