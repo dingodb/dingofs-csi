@@ -53,7 +53,7 @@ spec:
           value: /var/lib/dingofs/volume
         - name: DINGOFS_CONFIG_PATH
           value: /var/lib/dingofs/config
-        image: harbor.mas.zetyun.cn/dingofs/dingofs-csi:v2.1
+        image: harbor.zetyun.cn/dingofs/dingofs-csi:v2.1
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 5
@@ -98,7 +98,7 @@ spec:
         env:
         - name: ADDRESS
           value: /var/lib/csi/sockets/pluginproxy/csi.sock
-        image: harbor.mas.zetyun.cn/dingofs/sig-storage/csi-resizer:v1.9.0
+        image: harbor.zetyun.cn/dingofs/sig-storage/csi-resizer:v1.9.0
         name: csi-resizer
         volumeMounts:
         - mountPath: /var/lib/csi/sockets/pluginproxy/
@@ -111,7 +111,7 @@ spec:
           value: /csi/csi.sock
         - name: HEALTH_PORT
           value: "9909"
-        image: harbor.mas.zetyun.cn/dingofs/sig-storage/livenessprobe:v2.11.0
+        image: harbor.zetyun.cn/dingofs/sig-storage/livenessprobe:v2.11.0
         name: liveness-probe
         volumeMounts:
         - mountPath: /csi
