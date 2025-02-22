@@ -494,7 +494,12 @@ func ApplyConfigPatch(setting *DfsSetting) {
 		}
 		setting.MountOptions = append(setting.MountOptions, option)
 	}
-	klog.Info("merged fsetting.MountOptions", setting.MountOptions)
+	mountOptionJSON, err := json.MarshalIndent(setting.MountOptions, "", "  ")
+	if err != nil {
+		klog.ErrorS(err, "marshal mount options error")
+	} else {
+		klog.Info("merged mount options", string(mountOptionJSON))
+	}
 }
 
 // GenMountPodPatch generate mount pod patch from dfsSettting
@@ -525,7 +530,13 @@ func GenMountPodPatch(setting *DfsSetting) MountPodPatch {
 	strData = strings.ReplaceAll(strData, "${VOLUME_NAME}", setting.Name)
 	strData = strings.ReplaceAll(strData, "${SUB_PATH}", setting.SubPath)
 	_ = json.Unmarshal([]byte(strData), patch)
-	klog.Infof("volumeId[%s] using patch:%#v", setting.VolumeId, patch)
+	patchJSON, err := json.MarshalIndent(patch, "", "  ")
+	if err != nil {
+		klog.ErrorS(err, "marshal patch error")
+	} else {
+		klog.Infof("volumeId[%s] using patch:%s", setting.VolumeId, string(patchJSON))
+	}
+
 	return *patch
 }
 

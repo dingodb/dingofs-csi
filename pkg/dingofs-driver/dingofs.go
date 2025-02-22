@@ -2,6 +2,7 @@ package dingofsdriver
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -222,7 +223,12 @@ func (d *dingofs) InitDfs(ctx context.Context, volumeID string, target string, s
 
 	//	klog.Infof("Get info of volume, volumeId:%s, uuid:%s", volumeID, uuid)
 	//}
-	klog.Infof("dfs setting info: %v", dfsSetting)
+	dfsSettingJSON, err := json.MarshalIndent(dfsSetting, "", "  ")
+	if err != nil {
+		klog.ErrorS(err, "Failed to marshal dfsSetting to JSON")
+	} else {
+		klog.Infof("dingofs setting dfsSetting: %s", string(dfsSettingJSON))
+	}
 
 	return dfsSetting, nil
 }

@@ -218,7 +218,7 @@ func WaitUtilMountReady(ctx context.Context, podName, mntPath string, timeout ti
 	waitCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	// Wait until the mount point is ready
-	klog.Infof("schedule check mount pod [%s] ready", podName)
+	klog.Infof("schedule check mount pod [%s] status...", podName)
 	for {
 		var finfo os.FileInfo
 		if err := util.DoWithTimeout(waitCtx, timeout, func() (err error) {
@@ -228,7 +228,7 @@ func WaitUtilMountReady(ctx context.Context, podName, mntPath string, timeout ti
 			if err == context.Canceled || err == context.DeadlineExceeded {
 				break
 			}
-			klog.V(1).Info("Mount path is not ready, wait for it.", "mountPath", mntPath, "podName", podName, "error", err)
+			klog.Info("Mount path is not ready, wait for it.", "mountPath:", mntPath, "podName:", podName, "error:", err)
 			time.Sleep(time.Millisecond * 500)
 			continue
 		}
@@ -240,7 +240,7 @@ func WaitUtilMountReady(ctx context.Context, podName, mntPath string, timeout ti
 				klog.Infof("Mount point is ready, podName [%s]", podName)
 				return nil
 			}
-			klog.V(1).Info("Mount point is not ready, wait for it", "podName", podName)
+			klog.Info("Mount point is not ready, wait for it", "podName", podName)
 		}
 		time.Sleep(time.Millisecond * 500)
 	}
@@ -396,7 +396,12 @@ func GenMountPodName(ctx context.Context, client *k8sclient.K8sClient, dfsSettin
 		config.PodVolumeIdLabelKey: dfsSetting.UniqueId,
 		config.PodHashLabelKey:     dfsSetting.HashVal,
 	}}
-	klog.Info("pod selector label", labelSelector)
+	selectorJSON, err := json.MarshalIndent(labelSelector, "", "  ")
+	if err != nil {
+		klog.ErrorS(err, "Failed to marshal selector to JSON")
+	} else {
+		klog.Infof("pod selector label: %s", string(selectorJSON))
+	}
 	pods, err := client.ListPod(ctx, config.Namespace, labelSelector, nil)
 	if err != nil {
 		klog.ErrorS(err, "List pods of uniqueId:%s, hashVal:%s", dfsSetting.UniqueId, dfsSetting.HashVal)

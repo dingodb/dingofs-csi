@@ -52,8 +52,8 @@ import (
 const (
 	timeout = 10 * time.Second
 	// node port range
-	nodePortMin = 30000
-	nodePortMax = 32767
+	nodePortMin = 31000
+	nodePortMax = 31999
 
 	defaultMetric = 9000 // mountpod default metric port
 )
@@ -129,10 +129,10 @@ func (k *K8sClient) CreatePod(ctx context.Context, pod *corev1.Pod) (*corev1.Pod
 		clientLog.Info("Create pod: pod is nil")
 		return nil, nil
 	}
-	clientLog.Info("Create pod", "name", pod.Name)
+	clientLog.Info("Create pod", " name:", pod.Name)
 	mntPod, err := k.CoreV1().Pods(pod.Namespace).Create(ctx, pod, metav1.CreateOptions{})
 	if err != nil {
-		clientLog.Info("Can't create pod", "name", pod.Name, "error", err)
+		clientLog.Info("Can't create pod", "name: ", pod.Name, "error: ", err)
 		return nil, err
 	}
 
@@ -146,7 +146,7 @@ func (k *K8sClient) CreatePod(ctx context.Context, pod *corev1.Pod) (*corev1.Pod
 	// Create service for mountpod
 	_, err = k.createSerivce(ctx, pod.Namespace, pod.Name, metricPort)
 	if err != nil {
-		clientLog.Info("Can't create service for mountpod", "name", pod.Name, "error", err)
+		clientLog.Info("Can't create service for mountpod, ", "name:", pod.Name, "error:", err)
 		// return nil, err
 	}
 	return mntPod, nil
@@ -154,7 +154,14 @@ func (k *K8sClient) CreatePod(ctx context.Context, pod *corev1.Pod) (*corev1.Pod
 
 // createService create service for mountpod
 func (k *K8sClient) createSerivce(ctx context.Context, namespace string, podName string, metricPort int) (*corev1.Service, error) {
-	volInfo := podName[len(podName)-47:] // <volumeId>-<random-6-digit>: pvc-cc5cb2f5-e6fb-4a31-9476-6d16dedbc607-foogee
+	volInfo := ""
+	if len(podName) > 47 {
+		volInfo = podName[len(podName)-47:] // <volumeId>-<random-6-digit>: {pvc-cc5cb2f5-e6fb-4a31-9476-6d16dedbc607}-{foogee}
+		klog.Info("mount podName is too long, use last 47 characters as volume info", "podName", podName, "volInfo", volInfo)
+	} else {
+		volInfo = podName
+		klog.Infof("mount podName is short, use podNam [%s] as volume info", podName)
+	}
 	// Define the Service
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -188,7 +195,7 @@ func (k *K8sClient) createSerivce(ctx context.Context, namespace string, podName
 }
 
 func (k *K8sClient) GetPod(ctx context.Context, podName, namespace string) (*corev1.Pod, error) {
-	clientLog.Info("Get pod", "name", podName)
+	klog.Info("Get pod name:", podName)
 	mntPod, err := k.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
 		clientLog.Info("Can't get pod", "name", podName, "namespace", namespace, "error", err)

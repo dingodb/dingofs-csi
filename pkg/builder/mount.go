@@ -18,6 +18,7 @@ package builder
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -64,7 +65,7 @@ func NewPodMount(client *k8sclient.K8sClient, mounter k8sMount.SafeFormatAndMoun
 func (p *PodMount) DMount(ctx context.Context, appInfo *config.AppInfo, dfsSetting *config.DfsSetting) error {
 	hashVal := util.GenHashOfSetting(*dfsSetting)
 	dfsSetting.HashVal = hashVal
-	klog.Infof("config.dfsSetting:%#v", *dfsSetting)
+	//klog.Infof("config.dfsSetting:%#v", *dfsSetting)
 	var mountPodName string
 	var err error
 
@@ -150,7 +151,13 @@ func (p *PodMount) createPodOrAddRef(ctx context.Context, podName string, dfsSet
 		} else if err != nil {
 			if k8serrors.IsNotFound(err) {
 				// pod not exist, create
-				klog.Infof("Begin create pod:%s, config info:%v", podName, dfsSetting)
+				dfsSettingJSON, err := json.MarshalIndent(dfsSetting, "", "  ")
+				if err != nil {
+					klog.ErrorS(err, "Failed to marshal dfsSetting to JSON")
+				} else {
+					klog.Infof("Begin create pod:%s, config info:%s", podName, string(dfsSettingJSON))
+				}
+
 				newPod, err := r.NewMountPod(podName)
 				klog.V(5).Infof("init mount pod spec:%#v", newPod.Spec)
 				if err != nil {
