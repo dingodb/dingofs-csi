@@ -141,7 +141,7 @@ func (ct *curvefsTool) CreateFs(
 		if errQuota != nil {
 			return status.Errorf(
 				codes.Internal,
-				"curve config fs quota failed. cmd: %s %v, output: %s, err: %v",
+				"dingo config fs quota failed. cmd: %s %v, output: %s, err: %v",
 				toolPath,
 				configQuotaArgs,
 				outputQuota,

@@ -240,7 +240,7 @@ func WaitUtilMountReady(ctx context.Context, podName, mntPath string, timeout ti
 				klog.Infof("Mount point is ready, podName [%s]", podName)
 				return nil
 			}
-			klog.Info("Mount point is not ready, wait for it", "podName", podName)
+			klog.V(6).Info("Mount point is not ready, wait for it", "podName", podName)
 		}
 		time.Sleep(time.Millisecond * 500)
 	}
