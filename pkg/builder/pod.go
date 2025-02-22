@@ -19,6 +19,7 @@ package builder
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path"
 	"path/filepath"
@@ -103,9 +104,19 @@ func (r *PodBuilder) NewMountPod(podName string) (*corev1.Pod, error) {
 	volumes, volumeMounts := r.genPodVolumes()
 	pod.Spec.Volumes = append(pod.Spec.Volumes, volumes...)
 	pod.Spec.Containers[0].VolumeMounts = append(pod.Spec.Containers[0].VolumeMounts, volumeMounts...)
-
-	klog.Infof("pod volumes: %v", pod.Spec.Volumes)
-	klog.Infof("pod volumeMounts: %v", pod.Spec.Containers[0].VolumeMounts)
+	//marshal pod volumes and volumeMounts to json
+	volumeMountsJSON, err := json.MarshalIndent(pod.Spec.Containers[0].VolumeMounts, "", "  ")
+	if err != nil {
+		klog.ErrorS(err, "Failed to marshal volume mounts to JSON")
+	} else {
+		klog.Infof("csi-driver volume mounts JSON: %s", string(volumeMountsJSON))
+	}
+	volumeJSON, err := json.MarshalIndent(pod.Spec.Volumes, "", "  ")
+	if err != nil {
+		klog.ErrorS(err, "Failed to marshal volumes to JSON")
+	} else {
+		klog.Infof("csi-driver pod volumes JSON: %s", string(volumeJSON))
+	}
 
 	// add cache-dir hostpath & PVC volume
 	cacheVolumes, cacheVolumeMounts := r.genCacheDirVolumes()
