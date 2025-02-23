@@ -15,7 +15,7 @@ mountOptions:
   - fs.nocto_suffix=.ckpt
   - block_cache.cache_store=disk
   - disk_cache.cache_dir=/dingofs/client/data/cache/0;/dingofs/client/data/cache/1;/dingofs/client/data/cache/2
-  - disk_cache.cache_size_mb=3145728   # 3T
+  - disk_cache.cache_size_mb=1048576   # 1T
   - disk_cache.drop_page_cache=true
   - data_stream.background_flush.interval_ms=10
   - data_stream.background_flush.trigger_force_memory_ratio=0.98
@@ -25,7 +25,7 @@ mountOptions:
   - data_stream.chunk.flush_queue_size=10000
   - data_stream.slice.flush_workers=1024
   - data_stream.slice.flush_queue_size=10000
-  - data_stream.page.total_size_mb=51200
+  - data_stream.page.total_size_mb=10240  # 10G
   - s3.readCacheThreads=8
   - fs.kernelCache.attrTimeoutSec=3
   - fs.kernelCache.dirAttrTimeoutSec=3
