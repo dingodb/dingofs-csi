@@ -446,12 +446,14 @@ func (d *dingofs) DfsUnmount(ctx context.Context, volumeId, mountPath string) er
 	mountPods = append(mountPods, pods...)
 	// find pod by target
 	key := util.GetReferenceKey(mountPath)
+
 	for _, po := range mountPods {
 		if _, ok := po.Annotations[key]; ok {
 			mountPod = &po
 			break
 		}
 	}
+	klog.Infof("according mountPath:[%s], refer key:[%s], find mountPod:[%s] ", mountPath, key, mountPod.Name)
 	if mountPod != nil {
 		podName = mountPod.Name
 		hashVal = mountPod.Labels[config.PodHashLabelKey]
@@ -630,6 +632,7 @@ func (d *dingofs) CreateFS(
 		return err
 	}
 	ct.ToolParams["fsname"] = fsName
+	ct.ToolParams["rpcretrytimes"] = "5"
 	// call dingofs create fs
 	createFsArgs := []string{"create", "fs"}
 	for k, v := range ct.ToolParams {

@@ -356,7 +356,7 @@ func GenPodAttrWithCfg(setting *DfsSetting, volCtx map[string]string) error {
 		memoryRequest := volCtx[MountPodMemRequestKey]
 		attr.Resources, err = ParsePodResources(cpuLimit, memoryLimit, cpuRequest, memoryRequest)
 		if err != nil {
-			klog.Error("Parse resource error: %v", err)
+			klog.Errorf("Parse resource error: %v", err)
 			return err
 		}
 		if v, ok := volCtx[MountPodLabelKey]; ok && v != "" {
@@ -415,6 +415,7 @@ func ParsePodResources(cpuLimit, memoryLimit, cpuRequest, memoryRequest string) 
 		if res := q.Cmp(*resource.NewQuantity(0, resource.DecimalSI)); res <= 0 {
 			delete(podLimit, corev1.ResourceCPU)
 		}
+		klog.Infof("parse cpu limit: %+v", q)
 	}
 	if memoryLimit != "" {
 		if podLimit[corev1.ResourceMemory], err = resource.ParseQuantity(memoryLimit); err != nil {
@@ -424,6 +425,7 @@ func ParsePodResources(cpuLimit, memoryLimit, cpuRequest, memoryRequest string) 
 		if res := q.Cmp(*resource.NewQuantity(0, resource.DecimalSI)); res <= 0 {
 			delete(podLimit, corev1.ResourceMemory)
 		}
+		klog.Infof("parse memory limit: %+v", q)
 	}
 	if cpuRequest != "" {
 		if podRequest[corev1.ResourceCPU], err = resource.ParseQuantity(cpuRequest); err != nil {
@@ -433,6 +435,7 @@ func ParsePodResources(cpuLimit, memoryLimit, cpuRequest, memoryRequest string) 
 		if res := q.Cmp(*resource.NewQuantity(0, resource.DecimalSI)); res <= 0 {
 			delete(podRequest, corev1.ResourceCPU)
 		}
+		klog.Infof("parse cpu request: %+v", q)
 	}
 	if memoryRequest != "" {
 		if podRequest[corev1.ResourceMemory], err = resource.ParseQuantity(memoryRequest); err != nil {
@@ -442,6 +445,7 @@ func ParsePodResources(cpuLimit, memoryLimit, cpuRequest, memoryRequest string) 
 		if res := q.Cmp(*resource.NewQuantity(0, resource.DecimalSI)); res <= 0 {
 			delete(podRequest, corev1.ResourceMemory)
 		}
+		klog.Infof("parse memory request: %+v", q)
 	}
 	return corev1.ResourceRequirements{
 		Limits:   podLimit,

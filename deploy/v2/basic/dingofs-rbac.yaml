@@ -92,6 +92,12 @@ rules:
   verbs:
   - get
   - list
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["create", "get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["create"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -269,27 +275,3 @@ subjects:
 - kind: ServiceAccount
   name: dingofs-csi-controller-sa
   namespace: dingofs
----
-kind: Role
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  namespace: dingofs
-  name: create-service
-rules:
-  - apiGroups: [""]
-    resources: ["services"]
-    verbs: ["create", "get", "list", "watch"]
----
-kind: RoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: create-service-binding
-  namespace: dingofs
-subjects:
-  - kind: ServiceAccount
-    name: dingofs-csi-node-sa
-    namespace: dingofs
-roleRef:
-  kind: Role
-  name: create-service
-  apiGroup: rbac.authorization.k8s.io

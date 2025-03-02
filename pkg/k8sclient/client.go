@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
@@ -55,7 +56,8 @@ const (
 	nodePortMin = 31000
 	nodePortMax = 31999
 
-	defaultMetric = 9000 // mountpod default metric port
+	defaultMetric       = 9000 // mountpod default metric port
+	SvcUniqueIdLabelKey = "service-uniqueid"
 )
 
 var clientLog = klog.NewKlogr().WithName("k8s client")
@@ -135,6 +137,13 @@ func (k *K8sClient) CreatePod(ctx context.Context, pod *corev1.Pod) (*corev1.Pod
 		clientLog.Info("Can't create pod", "name: ", pod.Name, "error: ", err)
 		return nil, err
 	}
+	// print marshal mountPod info
+	mntPodJSON, err := json.MarshalIndent(mntPod, "", "  ")
+	if err != nil {
+		clientLog.Info("Failed to marshal mountPod to JSON")
+	} else {
+		clientLog.Info("Create mountPod success", "mountPod:", string(mntPodJSON))
+	}
 
 	// expose mountpod metric port to host by NodePort
 	// Generate base NodePort
@@ -144,7 +153,7 @@ func (k *K8sClient) CreatePod(ctx context.Context, pod *corev1.Pod) (*corev1.Pod
 	metricPort := findAvailableNodePort(basePort)
 	klog.Infof("Allocated metric NodePort for pod %s: %d\n", pod.Name, metricPort)
 	// Create service for mountpod
-	_, err = k.createSerivce(ctx, pod.Namespace, pod.Name, metricPort)
+	_, err = k.createSerivce(ctx, pod.Spec.NodeSelector["kubernetes.io/hostname"], pod.Namespace, pod.Name, metricPort) // nodeName also could use pod.Spec.NodeSelector["kubernetes.io/hostname"]
 	if err != nil {
 		clientLog.Info("Can't create service for mountpod, ", "name:", pod.Name, "error:", err)
 		// return nil, err
@@ -153,20 +162,25 @@ func (k *K8sClient) CreatePod(ctx context.Context, pod *corev1.Pod) (*corev1.Pod
 }
 
 // createService create service for mountpod
-func (k *K8sClient) createSerivce(ctx context.Context, namespace string, podName string, metricPort int) (*corev1.Service, error) {
-	volInfo := ""
-	if len(podName) > 47 {
-		volInfo = podName[len(podName)-47:] // <volumeId>-<random-6-digit>: {pvc-cc5cb2f5-e6fb-4a31-9476-6d16dedbc607}-{foogee}
-		klog.Info("mount podName is too long, use last 47 characters as volume info", "podName", podName, "volInfo", volInfo)
-	} else {
-		volInfo = podName
-		klog.Infof("mount podName is short, use podNam [%s] as volume info", podName)
-	}
+func (k *K8sClient) createSerivce(ctx context.Context, nodeName string, namespace string, podName string, metricPort int) (*corev1.Service, error) {
+	//volInfo := ""
+	//if len(podName) > 47 {
+	//	volInfo = podName[len(podName)-47:] // <volumeId>-<random-6-digit>: {pvc-cc5cb2f5-e6fb-4a31-9476-6d16dedbc607}-{foogee}
+	//	klog.Info("mount podName is too long, use last 47 characters as volume info", "podName", podName, "volInfo", volInfo)
+	//} else {
+	//	volInfo = podName
+	//	klog.Infof("mount podName is short, use podNam [%s] as volume info", podName)
+	//}
+
+	uniqueId := podName[len(podName)-6:]
+	serviceInfo := fmt.Sprintf("%s-%s-metrics", nodeName, uniqueId)
+
 	// Define the Service
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      fmt.Sprintf("%s-metrics", volInfo),
+			Name:      serviceInfo,
 			Namespace: namespace,
+			Labels:    map[string]string{SvcUniqueIdLabelKey: uniqueId},
 		},
 		Spec: corev1.ServiceSpec{
 			Type: corev1.ServiceTypeNodePort,
@@ -179,7 +193,7 @@ func (k *K8sClient) createSerivce(ctx context.Context, namespace string, podName
 				},
 			},
 			Selector: map[string]string{
-				"pod-uniqueid": podName[len(podName)-6:], // Match pod label
+				"pod-uniqueid": uniqueId, // Match pod label
 			},
 		},
 	}
@@ -192,6 +206,11 @@ func (k *K8sClient) createSerivce(ctx context.Context, namespace string, podName
 	}
 	klog.Infof("Service %s created successfully with NodePort %d\n", service.Name, metricPort)
 	return s, nil
+}
+
+func (k *K8sClient) DeleteService(ctx context.Context, svcName, namespace string) error {
+	clientLog.Info("Delete service", "name:", svcName)
+	return k.CoreV1().Services(namespace).Delete(ctx, svcName, metav1.DeleteOptions{})
 }
 
 func (k *K8sClient) GetPod(ctx context.Context, podName, namespace string) (*corev1.Pod, error) {
