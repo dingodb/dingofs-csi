@@ -72,10 +72,10 @@ const (
 	MdsAddrKey = "mdsOpt_rpcRetryOpt_addrs"
 
 	// default value
-	DefaultMountPodCpuLimit   = "2000m"
-	DefaultMountPodMemLimit   = "5Gi"
-	DefaultMountPodCpuRequest = "1000m"
-	DefaultMountPodMemRequest = "1Gi"
+	DefaultMountPodCpuLimit   = "4000m"
+	DefaultMountPodMemLimit   = "20Gi"
+	DefaultMountPodCpuRequest = "2000m"
+	DefaultMountPodMemRequest = "15Gi"
 
 	// config in pv
 	MountPodCpuLimitKey    = "dingofs/mount-cpu-limit"
@@ -133,4 +133,10 @@ const (
 	ControllerExpandSecretNamespace = "csi.storage.k8s.io/controller-expand-secret-namespace"
 
 	ResyncPeriod = 1000 * time.Millisecond
+
+	// mountOptions
+	DefaultS3LogPrefixKey        = "s3.logPrefix"
+	DefaultS3LogPrefixVal        = "/dingofs/client/logs"
+	DefaultClientCommonLogDirKey = "client.common.logDir"
+	DefaultClientCommonLogDirVal = "/dingofs/client/logs"
 )

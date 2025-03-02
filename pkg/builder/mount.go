@@ -159,7 +159,7 @@ func (p *PodMount) createPodOrAddRef(ctx context.Context, podName string, dfsSet
 				}
 
 				newPod, err := r.NewMountPod(podName)
-				klog.V(5).Infof("init mount pod spec:%#v", newPod.Spec)
+				//klog.V(5).Infof("init mount pod spec:%#v", newPod.Spec)
 				if err != nil {
 					klog.ErrorS(err, "Make new mount pod error", "podName", podName)
 					return err
@@ -478,6 +478,14 @@ func (p *PodMount) DUmount(ctx context.Context, target, podName string) error {
 				// do not return err if delete secret failed
 				klog.V(1).Info("Delete secret error", "secretName", secretName, "error", err)
 			}
+
+			// delete related service
+			serviceUniqueId := podName[len(podName)-6:]
+			serviceName := fmt.Sprintf("%s-%s-metrics", config.NodeName, serviceUniqueId)
+			if err := p.K8sClient.DeleteService(ctx, serviceName, po.Namespace); !k8serrors.IsNotFound(err) && err != nil {
+				// do not return err if delete service failed
+				klog.V(1).Info("Delete service error", "serviceName", serviceName, "error", err)
+			}
 		}
 		return nil
 	})
@@ -508,7 +516,7 @@ func (p *PodMount) getNotCompleteCnLog(ctx context.Context, podName string) (log
 func (p *PodMount) UmountTarget(ctx context.Context, target, podName string) error {
 	// targetPath may be mount bind many times when mount point recovered.
 	// umount until it's not mounted.
-	klog.Info("lazy umount", "target", target)
+	klog.Info("lazy umount", " target: ", target)
 	for {
 		command := exec.Command("umount", "-l", target)
 		out, err := command.CombinedOutput()
@@ -552,7 +560,7 @@ func (p *PodMount) UmountTarget(ctx context.Context, target, podName string) err
 	}
 
 	key := util.GetReferenceKey(target)
-	klog.V(1).Info("Target hash of target", "target", target, "key", key)
+	klog.V(1).Infof("Target hash of target:[%s], key: [%s]", target, key)
 
 	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		po, err := p.K8sClient.GetPod(ctx, pod.Name, pod.Namespace)

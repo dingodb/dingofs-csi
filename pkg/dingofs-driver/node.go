@@ -18,6 +18,8 @@ package dingofsdriver
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -87,7 +89,12 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	ctx = util.WithLog(ctx, log)
 
 	// WARNING: debug only, secrets included
-	log.V(1).Info("called with args", "args", req)
+	reqJson, err := json.MarshalIndent(req, "", "  ")
+	if err != nil {
+		log.Error(err, "Failed to marshal req to JSON")
+	} else {
+		log.Info("req JSON:", string(reqJson))
+	}
 
 	target := req.GetTargetPath()
 	if len(target) == 0 {
@@ -141,7 +148,27 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	// -o user=curvefs \
 	// -o conf=/dingofs/client/conf/client.conf \
 	// /dingofs/client/mnt/mnt/mp-1
-	log.Info("mounting dingofs", "secret", reflect.ValueOf(secrets).MapKeys(), "options", mountOptions)
+
+	//check mountOptions does have DefaultS3LogPrefixKey or not
+	foundLogPrefix := false
+	foundLogDir := false
+	for _, item := range mountOptions {
+		if strings.HasPrefix(item, config.DefaultS3LogPrefixKey+"=") {
+			foundLogPrefix = true
+		}
+		if strings.HasPrefix(item, config.DefaultClientCommonLogDirKey+"=") {
+			foundLogPrefix = true
+		}
+	}
+
+	if !foundLogPrefix {
+		mountOptions = append(mountOptions, fmt.Sprintf("%s=%s/%s", config.DefaultS3LogPrefixKey, config.DefaultS3LogPrefixVal, volumeID))
+	}
+	if !foundLogDir {
+		mountOptions = append(mountOptions, fmt.Sprintf("%s=%s/%s", config.DefaultClientCommonLogDirKey, config.DefaultClientCommonLogDirVal, volumeID))
+	}
+
+	log.Info("mounting dingofs", "secret", reflect.ValueOf(secrets).MapKeys(), "mountOptions", mountOptions)
 	dfs, err := d.provider.DfsMount(ctx, volumeID, target, secrets, volCtx, mountOptions)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not mount dingofs: %v", err)
@@ -195,7 +222,13 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 // NodeUnpublishVolume is a reverse operation of NodePublishVolume. This RPC is typically called by the CO when the workload using the volume is being moved to a different node, or all the workload using the volume on a node has finished.
 func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	log := klog.NewKlogr().WithName("NodeUnpublishVolume")
-	log.V(1).Info("called with args", "args", req)
+	// marshal req to json
+	reqJson, err := json.MarshalIndent(req, "", "  ")
+	if err != nil {
+		log.Error(err, "Failed to marshal req to JSON")
+	} else {
+		log.Info("req JSON:", string(reqJson))
+	}
 
 	target := req.GetTargetPath()
 	if len(target) == 0 {
@@ -205,7 +238,7 @@ func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	volumeId := req.GetVolumeId()
 	log.Info("get volume_id", "volumeId", volumeId)
 
-	err := d.provider.DfsUnmount(ctx, volumeId, target)
+	err = d.provider.DfsUnmount(ctx, volumeId, target)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not unmount %q: %v", target, err)
 	}
