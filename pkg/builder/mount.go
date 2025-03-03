@@ -123,8 +123,40 @@ func (p *PodMount) createPodOrAddRef(ctx context.Context, podName string, dfsSet
 	// mkdir mountpath
 	err = util.DoWithTimeout(ctx, 3*time.Second, func() error {
 		exist, _ := k8sMount.PathExists(dfsSetting.MountPath)
+		klog.Infof("mount path:%s, exist:%v", dfsSetting.MountPath, exist)
 		if !exist {
-			return os.MkdirAll(dfsSetting.MountPath, 0777)
+			// check if dir status is ok
+			_, err := os.Stat(dfsSetting.MountPath)
+			if err != nil {
+				klog.ErrorS(err, "stat mount path error", "mountPath:", dfsSetting.MountPath)
+				// check err is transport endpoint is not connected
+				if strings.Contains(err.Error(), "transport endpoint is not connected") {
+					// umount target
+					target := dfsSetting.MountPath
+					klog.Info("umount target before mkdir", " target:", target)
+					for {
+						command := exec.Command("umount", "-l", target)
+						out, err := command.CombinedOutput()
+						if err == nil {
+							continue
+						}
+						klog.Info(string(out))
+						if !strings.Contains(string(out), "not mounted") &&
+							!strings.Contains(string(out), "mountpoint not found") &&
+							!strings.Contains(string(out), "no mount point specified") {
+							klog.ErrorS(err, "Could not lazy unmount", "target:", target, ", out:", string(out))
+							return err
+						}
+						break
+					}
+				}
+			}
+			err = os.MkdirAll(dfsSetting.MountPath, 0777)
+			if err != nil {
+				klog.ErrorS(err, "mkdir mount path error", "mountPath:", dfsSetting.MountPath)
+				return err
+			}
+			klog.Info("mkdir mount path successful!", " mountPath:", dfsSetting.MountPath)
 		}
 		return nil
 	})
@@ -230,7 +262,7 @@ func (p *PodMount) AddRefOfMount(ctx context.Context, target string, podName str
 		}
 		annotation := exist.Annotations
 		if _, ok := annotation[key]; ok {
-			klog.Info("Target ref in pod already exists, target:%s, podName:%s", target, podName)
+			klog.Infof("Target ref in pod already exists, target:%s, podName:%s", target, podName)
 			return nil
 		}
 		if annotation == nil {
@@ -242,7 +274,7 @@ func (p *PodMount) AddRefOfMount(ctx context.Context, target string, podName str
 		return resource.ReplacePodAnnotation(ctx, p.K8sClient, exist, annotation)
 	})
 	if err != nil {
-		klog.Error("Add target ref in mount pod[%s]error, %v ", podName, err)
+		klog.Errorf("Add target ref in mount pod[%s]error, %v ", podName, err)
 		return err
 	}
 	return nil
