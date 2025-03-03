@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"syscall"
 	"time"
@@ -228,7 +229,28 @@ func WaitUtilMountReady(ctx context.Context, podName, mntPath string, timeout ti
 			if err == context.Canceled || err == context.DeadlineExceeded {
 				break
 			}
-			klog.Info("Mount path is not ready, wait for it.", "mountPath:", mntPath, "podName:", podName, "error:", err)
+			klog.Infof("Mount path is not ready, wait for it. mountPath:%s, podName: %s, error: %v", mntPath, podName, err)
+			// check err is transport endpoint is not connected
+			if strings.Contains(err.Error(), "transport endpoint is not connected") {
+				// umount target
+				target := mntPath
+				klog.Info("umount target before mkdir", " target:", target)
+				for {
+					command := exec.Command("umount", "-l", target)
+					out, err := command.CombinedOutput()
+					if err == nil {
+						continue
+					}
+					klog.Info(string(out))
+					if !strings.Contains(string(out), "not mounted") &&
+						!strings.Contains(string(out), "mountpoint not found") &&
+						!strings.Contains(string(out), "no mount point specified") {
+						klog.ErrorS(err, "Could not lazy unmount", "target:", target, ", out:", string(out))
+						return err
+					}
+					break
+				}
+			}
 			time.Sleep(time.Millisecond * 500)
 			continue
 		}
