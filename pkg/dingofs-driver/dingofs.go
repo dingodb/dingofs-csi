@@ -453,8 +453,9 @@ func (d *dingofs) DfsUnmount(ctx context.Context, volumeId, mountPath string) er
 			break
 		}
 	}
-	klog.Infof("according mountPath:[%s], refer key:[%s], find mountPod:[%s] ", mountPath, key, mountPod.Name)
+
 	if mountPod != nil {
+		klog.Infof("according mountPath:[%s], refer key:[%s], find mountPod:[%s] ", mountPath, key, mountPod.Name)
 		podName = mountPod.Name
 		hashVal = mountPod.Labels[config.PodHashLabelKey]
 		if hashVal == "" {
