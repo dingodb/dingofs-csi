@@ -220,6 +220,12 @@ func (k *K8sClient) GetPod(ctx context.Context, podName, namespace string) (*cor
 		clientLog.Info("Can't get pod", "name", podName, "namespace", namespace, "error", err)
 		return nil, err
 	}
+
+	if mntPod == nil {
+		return nil, fmt.Errorf("retrieved pod is nil for name: %s in namespace: %s", podName, namespace)
+	}
+
+	klog.Info("Successfully retrieved pod:", podName)
 	return mntPod, nil
 }
 
