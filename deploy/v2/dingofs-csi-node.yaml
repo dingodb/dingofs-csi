@@ -62,8 +62,8 @@ spec:
         - name: DINGOFS_CONFIG_PATH
           value: /var/lib/dingofs/config
         - name: DINGOFS_MOUNT_IMAGE # mount pod image
-          value: harbor.zetyun.cn/dingofs/dingofs-csi:v2.1
-        image: harbor.zetyun.cn/dingofs/dingofs-csi:v2.1
+          value: harbor.zetyun.cn/dingofs/dingofs-csi:v2.1-3.0.12
+        image: harbor.zetyun.cn/dingofs/dingofs-csi:v2.1-3.0.12
         imagePullPolicy: Always
         livenessProbe:
           failureThreshold: 5
