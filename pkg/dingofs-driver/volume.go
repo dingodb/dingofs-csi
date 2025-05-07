@@ -9,7 +9,7 @@ import (
 	"github.com/jackblack369/dingofs-csi/pkg/config"
 	"github.com/jackblack369/dingofs-csi/pkg/util"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/mount"
+	"k8s.io/mount-utils"
 )
 
 const (
@@ -42,7 +42,7 @@ func (fs *dfs) GetBasePath() string {
 // CreateVol creates the directory needed
 func (fs *dfs) CreateVol(ctx context.Context, volumeID, subPath string) (string, error) {
 	volPath := filepath.Join(fs.MountPath, subPath)
-	klog.V(1).Info("checking volPath exists", "volPath", volPath, "fs", fs)
+	klog.Info("checking volPath exists", "volPath", volPath, "fs", fs)
 	var exists bool
 	if err := util.DoWithTimeout(ctx, config.DefaultCheckTimeout, func() (err error) {
 		exists, err = mount.PathExists(volPath)
@@ -104,7 +104,7 @@ func (fs *dfs) BindTarget(ctx context.Context, bindSource, target string) error 
 		util.UmountPath(ctx, target)
 	}
 	// bind target to mountpath
-	klog.Info("binding source at target", "source", bindSource, "target", target)
+	klog.Infof("binding source[%s] at target[%s]", bindSource, target)
 	if err := fs.Provider.Mount(bindSource, target, fsTypeNone, []string{"bind"}); err != nil {
 		os.Remove(target)
 		return err

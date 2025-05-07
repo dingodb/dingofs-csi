@@ -41,6 +41,8 @@ import (
 	"time"
 
 	"github.com/jackblack369/dingofs-csi/pkg/config"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
 )
 
@@ -296,4 +298,68 @@ func CheckExpectValue(m map[string]string, key string, targetValue string) bool 
 		return v == targetValue
 	}
 	return false
+}
+
+func GetDfsInfo(vID string) (config.DfsVol, error) {
+	splitInfos := strings.Split(vID, ";")
+	var dfsVol config.DfsVol
+
+	if len(splitInfos) == 2 {
+		/* fsname=<filesystem_name>;path=<dfs_mount_path> */
+		fsNameInfo := splitInfos[0]
+		mountPathInfo := splitInfos[1]
+		fsNameSplit := strings.Split(fsNameInfo, "=")
+		mountPathSplit := strings.Split(mountPathInfo, "=")
+		if len(fsNameSplit) < 2 || len(mountPathSplit) < 2 {
+			return config.DfsVol{}, status.Error(codes.Internal, fmt.Sprintf("Invalid Volume info : [%v]", vID))
+		}
+		dfsVol.FsName = fsNameSplit[1]
+		dfsVol.MountPath = mountPathSplit[1]
+		return dfsVol, nil
+	}
+
+	return config.DfsVol{}, status.Error(codes.Internal, fmt.Sprintf("Invalid Volume info : [%v]", vID))
+}
+
+// CheckDfsType checks if a given path is of type dingofs and
+// returns nil if it is a dingofs type, otherwise returns corresponding error.
+func CheckDfsType(ctx context.Context, path string) error {
+	dfsPaths := getDfsPaths()
+	isDfsPath := false
+	for _, dfsPath := range dfsPaths {
+		if strings.HasPrefix(path, dfsPath) {
+			isDfsPath = true
+			break
+		}
+	}
+
+	if !isDfsPath {
+		return fmt.Errorf("checkDfsType: the path [%s] is not a valid dingofs path ", path)
+	}
+
+	return nil
+}
+
+func getDfsPaths() []string {
+	var dingofsPaths []string
+	gpfsPathCmd := `cat /proc/mounts | grep "dingofs"`
+	cmd := exec.Command("bash", "-c", gpfsPathCmd)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		klog.Errorf("Error in executing command: [%s]", err)
+	} else {
+		outputPaths := string(output)
+		strOutput := strings.Split(outputPaths, "\n")
+		for _, out := range strOutput {
+			finalOutput := strings.Split(out, " ")
+			if len(finalOutput) == config.MountPathLength {
+				if finalOutput[1] != "" && finalOutput[2] == "fuse.dingofs" {
+					dingofsPaths = append(dingofsPaths, finalOutput[1])
+				}
+			}
+		}
+	}
+	// print the dingofs paths
+	klog.Infof("dingofs mount paths: %v", dingofsPaths)
+	return dingofsPaths
 }

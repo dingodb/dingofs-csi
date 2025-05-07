@@ -24,7 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
-	k8sMount "k8s.io/utils/mount"
+	k8sMount "k8s.io/mount-utils"
 
 	"github.com/jackblack369/dingofs-csi/pkg/util"
 )

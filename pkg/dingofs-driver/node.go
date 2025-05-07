@@ -20,8 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
+	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -29,11 +30,11 @@ import (
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
 	k8sexec "k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 
 	"github.com/jackblack369/dingofs-csi/pkg/config"
 	"github.com/jackblack369/dingofs-csi/pkg/k8sclient"
 	"github.com/jackblack369/dingofs-csi/pkg/util"
+	"k8s.io/mount-utils"
 )
 
 var (
@@ -64,6 +65,39 @@ func newNodeService(nodeID string, k8sClient *k8sclient.K8sClient) (*nodeService
 	}, nil
 }
 
+// A map for locking/unlocking a target path for NodePublish/NodeUnpublish
+// calls. The key is target path and value is a boolean true in case there
+// is any NodePublishVolume or NodeUnpublishVolume request in progress for
+// the target path.
+var nodePublishUnpublishLock map[string]bool
+
+// a mutex var used to make sure certain code blocks are executed by
+// only one goroutine at a time.
+var mutex sync.Mutex
+
+func lock(targetPath string, ctx context.Context) bool {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	if len(nodePublishUnpublishLock) == 0 {
+		nodePublishUnpublishLock = make(map[string]bool)
+	}
+
+	if _, exists := nodePublishUnpublishLock[targetPath]; exists {
+		return false
+	}
+	nodePublishUnpublishLock[targetPath] = true
+	klog.Infof("The target path is locked for NodePublish/NodeUnpublish: [%s]", targetPath)
+	return true
+}
+
+func unlock(targetPath string, ctx context.Context) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	delete(nodePublishUnpublishLock, targetPath)
+	klog.Infof("The target path is unlocked for NodePublish/NodeUnpublish: [%s]", targetPath)
+}
+
 // NodeStageVolume is called by the CO prior to the volume being consumed by any workloads on the node by `NodePublishVolume`
 func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
@@ -84,6 +118,9 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		log = log.WithValues("appName", volCtx[config.PodInfoName])
 	}
 	volumeID := req.GetVolumeId()
+	if len(volumeID) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "volumeID must be provided")
+	}
 	log = log.WithValues("volumeId", volumeID)
 
 	ctx = util.WithLog(ctx, log)
@@ -96,9 +133,18 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		log.Info("req JSON:", string(reqJson))
 	}
 
-	target := req.GetTargetPath()
-	if len(target) == 0 {
+	targetPath := req.GetTargetPath()
+	if len(targetPath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path not provided")
+	}
+
+	lockSuccess := lock(targetPath, ctx)
+	if !lockSuccess {
+		message := fmt.Sprintf("NodePublishVolume - another NodePublish/NodeUnpublish is in progress for the targetPath: [%s]", targetPath)
+		klog.Errorf("[%s] ", message)
+		return nil, status.Error(codes.Internal, message)
+	} else {
+		defer unlock(targetPath, ctx)
 	}
 
 	volCap := req.GetVolumeCapability()
@@ -111,9 +157,68 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Error(codes.InvalidArgument, "Volume capability not supported")
 	}
 
-	log.Info("creating dir", "target", target)
-	if err := d.provider.CreateTarget(ctx, target); err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not create dir %q: %v", target, err)
+	log.Info("creating dir", "target", targetPath)
+	if err := d.provider.CreateTarget(ctx, targetPath); err != nil {
+		return nil, status.Errorf(codes.Internal, "Could not create dir %q: %v", targetPath, err)
+	}
+
+	secrets := req.Secrets
+	if secrets == nil {
+		// use local pv
+		klog.Infof("secrets is nil, use local pv")
+		dfsVol, err := util.GetDfsInfo(volumeID)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, "NodePublishVolume : volumeID is not in proper format")
+		}
+
+		hostVolPath := dfsVol.MountPath
+		volPathInContainer := hostVolPath
+		_, err = os.Lstat(volPathInContainer)
+		if err != nil {
+			klog.Errorf("NodePublishVolume - lstat [%s] failed with error [%v]", volPathInContainer, err)
+			return nil, fmt.Errorf("NodePublishVolume - lstat [%s] failed with error [%v]", volPathInContainer, err)
+		}
+
+		mounter := &mount.Mounter{}
+		mntPoint, err := mounter.IsMountPoint(targetPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				if err = os.Mkdir(targetPath, 0750); err != nil {
+					klog.Errorf("NodePublishVolume - targetPath [%s] creation failed with error [%v]", targetPath, err)
+					return nil, fmt.Errorf("NodePublishVolume - targetPath [%s] creation failed with error [%v]", targetPath, err)
+				} else {
+					klog.Infof("NodePublishVolume - the target directory [%s] is created successfully", targetPath)
+				}
+			} else {
+				klog.Errorf("NodePublishVolume - targetPath [%s] check failed with error [%v]", targetPath, err)
+				return nil, fmt.Errorf("NodePublishVolume - targetPath [%s] check failed with error [%v]", targetPath, err)
+			}
+		}
+		if mntPoint {
+			klog.Infof("NodePublishVolume - [%s] is already a mount point", targetPath)
+			return &csi.NodePublishVolumeResponse{}, nil
+		}
+
+		// create bind mount
+		options := []string{"bind"}
+		klog.V(4).Infof("NodePublishVolume - creating bind mount [%v] -> [%v]", targetPath, hostVolPath)
+		if err := mounter.Mount(hostVolPath, targetPath, "", options); err != nil {
+			klog.Errorf("NodePublishVolume - mounting [%s] at [%s] failed with error [%v]", hostVolPath, targetPath, err)
+			return nil, fmt.Errorf("NodePublishVolume - mounting [%s] at [%s] failed with error [%v]", hostVolPath, targetPath, err)
+		}
+
+		//check for the dingofs type again, if not dingofs type, unmount and return error.
+		err = util.CheckDfsType(ctx, volPathInContainer)
+		if err != nil {
+			uerr := mounter.Unmount(targetPath)
+			if uerr != nil {
+				klog.Errorf("NodePublishVolume - unmount [%s] failed with error [%v]", targetPath, uerr)
+				return nil, fmt.Errorf("NodePublishVolume - unmount [%s] failed with error [%v]", targetPath, uerr)
+			}
+			return nil, err
+		}
+		klog.Infof("NodePublishVolume - successfully mounted [%s]", targetPath)
+		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
 	options := []string{}
@@ -126,8 +231,6 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		klog.Infof("volCap.getMount result:%#v", m)
 		options = append(options, m.MountFlags...)
 	}
-
-	secrets := req.Secrets
 
 	// get mountOptions from PV.volumeAttributes or StorageClass.parameters
 	mountOptions := []string{}
@@ -168,8 +271,8 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		mountOptions = append(mountOptions, fmt.Sprintf("%s=%s/%s", config.DefaultClientCommonLogDirKey, config.DefaultClientCommonLogDirVal, volumeID))
 	}
 
-	log.Info("mounting dingofs", "secret", reflect.ValueOf(secrets).MapKeys(), "mountOptions", mountOptions)
-	dfs, err := d.provider.DfsMount(ctx, volumeID, target, secrets, volCtx, mountOptions)
+	log.Info("mounting dingofs", "mountOptions", mountOptions)
+	dfs, err := d.provider.DfsMount(ctx, volumeID, targetPath, secrets, volCtx, mountOptions)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not mount dingofs: %v", err)
 	}
@@ -179,8 +282,8 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Errorf(codes.Internal, "Could not create volume: %s, %v", volumeID, err)
 	}
 
-	if err := dfs.BindTarget(ctx, bindSource, target); err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not bind %q at %q: %v", bindSource, target, err)
+	if err := dfs.BindTarget(ctx, bindSource, targetPath); err != nil {
+		return nil, status.Errorf(codes.Internal, "Could not bind %q at %q: %v", bindSource, targetPath, err)
 	}
 
 	// below code which is used to set quota is implemented in CreateFS
@@ -215,7 +318,7 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	//	}()
 	//}
 
-	log.Info("dingofs volume mounted", "volumeId", volumeID, "target", target)
+	log.Info("dingofs volume mounted", "volumeId", volumeID, "target", targetPath)
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
@@ -230,17 +333,61 @@ func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		log.Info("req JSON:", string(reqJson))
 	}
 
-	target := req.GetTargetPath()
-	if len(target) == 0 {
+	targetPath := req.GetTargetPath()
+	if len(targetPath) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path not provided")
 	}
 
 	volumeId := req.GetVolumeId()
 	log.Info("get volume_id", "volumeId", volumeId)
 
-	err = d.provider.DfsUnmount(ctx, volumeId, target)
+	lockSuccess := lock(targetPath, ctx)
+	if !lockSuccess {
+		message := fmt.Sprintf("NodeUnpublishVolume - another NodePublish/NodeUnpublish is in progress for the targetPath: [%s]", targetPath)
+		klog.Errorf(message)
+		return nil, status.Error(codes.Internal, message)
+	} else {
+		defer unlock(targetPath, ctx)
+	}
+
+	_, err = util.GetDfsInfo(volumeId)
+	// umount local pv
+	if err == nil {
+		//Check if target is bind mount and cleanup accordingly
+		_, err := os.Lstat(targetPath)
+		if err != nil {
+			//Handling for target path is already deleted/not present
+			if os.IsNotExist(err) {
+				klog.Infof("NodeUnpublishVolume - targetPath [%s] is not found, returning success ", targetPath)
+				return &csi.NodeUnpublishVolumeResponse{}, nil
+			}
+			//Handling for bindmount if filesystem is unmounted
+			if strings.Contains(err.Error(), "stale NFS file handle") {
+				klog.Warningf("NodeUnpublishVolume - unmount [%s] failed with error [%v]. trying forceful unmount", targetPath, err)
+				needReturn, response, error := d.provider.UnmountAndDelete(ctx, targetPath, true)
+				if needReturn {
+					return response, error
+				}
+				klog.Infof("NodeUnpublishVolume - forced unmount [%s] is successful", targetPath)
+				return &csi.NodeUnpublishVolumeResponse{}, nil
+			} else {
+				klog.Errorf("NodeUnpublishVolume - lstat [%s] failed with error [%v]", targetPath, err)
+				return nil, status.Error(codes.Internal, fmt.Sprintf("NodeUnpublishVolume - lstat [%s] failed with error [%v]", targetPath, err))
+			}
+		}
+
+		needReturn, response, error := d.provider.UnmountAndDelete(ctx, targetPath, false)
+		if needReturn {
+			return response, error
+		}
+
+		klog.Infof("NodeUnpublishVolume - successfully unpublished [%s]", targetPath)
+		return &csi.NodeUnpublishVolumeResponse{}, nil
+	}
+
+	err = d.provider.DfsUnmount(ctx, volumeId, targetPath)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not unmount %q: %v", target, err)
+		return nil, status.Errorf(codes.Internal, "Could not unmount %q: %v", targetPath, err)
 	}
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil

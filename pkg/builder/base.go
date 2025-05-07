@@ -37,6 +37,7 @@ import (
 
 const (
 	DfsDirName          = "dfs-dir"
+	HostDirName         = "host-dir"
 	UpdateDBDirName     = "updatedb"
 	UpdateDBCfgFile     = "/etc/updatedb.conf"
 	DfsFuseFdPathName   = "dfs-fuse-fd"

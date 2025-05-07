@@ -171,6 +171,11 @@ type CacheEmptyDir struct {
 	Path      string
 }
 
+type DfsVol struct {
+	FsName    string
+	MountPath string
+}
+
 func (mpp *MountPodPatch) IsMatch(pvc *corev1.PersistentVolumeClaim) bool {
 	if mpp.PVCSelector == nil {
 		return true

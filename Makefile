@@ -19,7 +19,7 @@ BUILD_FLAG += -a
 .PHONY: csi docker-build docker-push clean
 csi: 
 	go mod vendor
-	go build $(BUILD_FLAG) -ldflags "$(LD_FLAGS)" -o bin/dingofs-csi-driver ./cmd
+	CGO_ENABLED=1 CC=musl-gcc go build $(BUILD_FLAG) -ldflags "$(LD_FLAGS)" -o bin/dingofs-csi-driver ./cmd
 
 docker-build:
 	docker build --no-cache --platform linux/amd64 -t $(IMAGE_TAG) .
