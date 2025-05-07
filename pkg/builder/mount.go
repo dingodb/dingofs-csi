@@ -35,7 +35,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog/v2"
-	k8sMount "k8s.io/utils/mount"
+	k8sMount "k8s.io/mount-utils"
 )
 
 type MntInterface interface {

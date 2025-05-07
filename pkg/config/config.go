@@ -46,6 +46,7 @@ var (
 
 	DefaultMountImage = "dingodatabase/dingofs-csi:latest" // mount pod image, override by ENV
 	MountPointPath    = "/var/lib/dingofs/volume"
+	HostDirPath       = "/"
 
 	FORMAT_FUSE_ARGS = []string{
 		"-f",
@@ -155,4 +156,8 @@ const (
 	DefaultS3LogPrefixVal        = "/dingofs/client/logs"
 	DefaultClientCommonLogDirKey = "client.common.logDir"
 	DefaultClientCommonLogDirVal = "/dingofs/client/logs"
+
+	// local pv
+	MountPathLength = 6
+	HostDir         = "/host"
 )

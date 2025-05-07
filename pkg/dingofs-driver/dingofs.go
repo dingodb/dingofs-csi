@@ -13,6 +13,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/jackblack369/dingofs-csi/pkg/builder"
 	"github.com/jackblack369/dingofs-csi/pkg/config"
 	curvefsdriver "github.com/jackblack369/dingofs-csi/pkg/curvefs-driver"
@@ -29,8 +30,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	k8sexec "k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 )
 
 // Provider of dingofs
@@ -48,6 +49,7 @@ type Provider interface {
 	CreateTarget(ctx context.Context, target string) error
 	AuthFs(ctx context.Context, secrets map[string]string, dfsSetting *config.DfsSetting, force bool) (string, error)
 	// Status(ctx context.Context, metaUrl string) error
+	UnmountAndDelete(ctx context.Context, targetPath string, forceful bool) (bool, *csi.NodeUnpublishVolumeResponse, error)
 }
 
 type dingofs struct {
@@ -681,4 +683,49 @@ func (d *dingofs) CreateFS(
 	klog.Infof("create fs success, fsName: %s, quota: %v", fsName, ct.QuotaParams)
 
 	return nil
+}
+
+// UnmountAndDelete unmounts and deletes a targetPath (forcefully if
+// foreceful=true is passed) and returns a bool which tells if a
+// calling function should return, along with the response and error
+// to be returned if there are any.
+func (d *dingofs) UnmountAndDelete(ctx context.Context, targetPath string, forceful bool) (bool, *csi.NodeUnpublishVolumeResponse, error) {
+	klog.Infof("unmount and delete targetPath:[%s], forceful:[%v]", targetPath, forceful)
+	isMP := false
+	var err error
+	mounter := &mount.Mounter{}
+	if !forceful {
+		isMP, err = mounter.IsMountPoint(targetPath)
+		if err != nil {
+			klog.Errorf("checking the targetPath: [%s] for mountPoint,failed with error [%v]", targetPath, err)
+			if os.IsNotExist(err) {
+				klog.Infof("NodeUnpublishVolume - targetPath [%s] is not found when !forceful, returning success ", targetPath)
+				return true, &csi.NodeUnpublishVolumeResponse{}, nil
+			}
+			klog.Errorf("mount point check on targetPath:[%s] failed with error [%v]", targetPath, err)
+			return true, nil, status.Error(codes.Internal, fmt.Sprintf("NodeUnpublishVolume - mount point check on targetPath:[%s] failed with error [%v]", targetPath, err))
+		}
+		klog.Infof("isMP value for the target path [%s] is [%t]", targetPath, isMP)
+	}
+	if forceful || isMP {
+		// Unmount the targetPath
+		err = mounter.Unmount(targetPath)
+		if err != nil {
+			klog.Errorf("unmount [%s] failed with error [%v]", targetPath, err)
+			return true, nil, status.Error(codes.Internal, fmt.Sprintf("NodeUnpublishVolume - unmount [%s] failed with error [%v]", targetPath, err))
+		}
+		klog.Infof("[%s] %v is unmounted successfully", targetPath)
+	}
+	// Delete the mount point
+	if err = os.Remove(targetPath); err != nil {
+		klog.Errorf("remove targetPath:[%s] failed with error [%v]", targetPath, err)
+		if os.IsNotExist(err) {
+			klog.Infof("targetPath [%s] is not present", targetPath)
+			return false, nil, nil
+		}
+		klog.Infof("[%s] mount point:[%s] removal failed with error [%v]", targetPath, err)
+		return true, nil, status.Error(codes.Internal, fmt.Sprintf("NodeUnpublishVolume - mount point [%s] removal failed with error [%v]", targetPath, err))
+	}
+	klog.Infof("Path [%s] is deleted", targetPath)
+	return false, nil, nil
 }

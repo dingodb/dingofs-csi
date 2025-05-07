@@ -331,16 +331,16 @@ func (r *PodBuilder) genHostPathVolumes() (volumes []corev1.Volume, volumeMounts
 // 2. update db dir: mount updatedb.conf from host to mount pod
 // 3. dfs fuse fd path: mount fuse fd pass socket to mount pod
 func (r *PodBuilder) genPodVolumes() ([]corev1.Volume, []corev1.VolumeMount) {
-	dir := corev1.HostPathDirectoryOrCreate
+	dirOrCre := corev1.HostPathDirectoryOrCreate
 	file := corev1.HostPathFileOrCreate
-	mp := corev1.MountPropagationBidirectional
+	mountPropagationB := corev1.MountPropagationBidirectional
 	volumes := []corev1.Volume{
 		{
 			Name: DfsDirName,
 			VolumeSource: corev1.VolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{
 					Path: config.MountPointPath,
-					Type: &dir,
+					Type: &dirOrCre,
 				},
 			},
 		},
@@ -349,7 +349,7 @@ func (r *PodBuilder) genPodVolumes() ([]corev1.Volume, []corev1.VolumeMount) {
 			VolumeSource: corev1.VolumeSource{
 				HostPath: &corev1.HostPathVolumeSource{
 					Path: path.Join(DfsFuseFsPathInHost, r.dfsSetting.HashVal),
-					Type: &dir,
+					Type: &dirOrCre,
 				},
 			},
 		},
@@ -358,7 +358,7 @@ func (r *PodBuilder) genPodVolumes() ([]corev1.Volume, []corev1.VolumeMount) {
 		{
 			Name:             DfsDirName,
 			MountPath:        config.PodMountBase,
-			MountPropagation: &mp,
+			MountPropagation: &mountPropagationB,
 		},
 		{
 			Name:      DfsFuseFdPathName,

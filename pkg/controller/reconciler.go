@@ -27,8 +27,8 @@ import (
 	"golang.org/x/sync/errgroup"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog/v2"
+	"k8s.io/mount-utils"
 	k8sexec "k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 
 	"github.com/jackblack369/dingofs-csi/pkg/config"
 	"github.com/jackblack369/dingofs-csi/pkg/k8sclient"
