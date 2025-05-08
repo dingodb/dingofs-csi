@@ -353,7 +353,7 @@ func getDfsPaths() []string {
 		for _, out := range strOutput {
 			finalOutput := strings.Split(out, " ")
 			if len(finalOutput) == config.MountPathLength {
-				if finalOutput[1] != "" && finalOutput[2] == "fuse.dingofs" {
+				if finalOutput[1] != "" && (finalOutput[2] == "fuse" || finalOutput[2] == "fuse.dingofs") {
 					dingofsPaths = append(dingofsPaths, finalOutput[1])
 				}
 			}
