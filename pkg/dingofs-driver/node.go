@@ -172,7 +172,7 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		}
 
 		hostVolPath := dfsVol.MountPath
-		volPathInContainer := hostVolPath
+		volPathInContainer := config.HostDir + hostVolPath
 		_, err = os.Lstat(volPathInContainer)
 		if err != nil {
 			klog.Errorf("NodePublishVolume - lstat [%s] failed with error [%v]", volPathInContainer, err)
@@ -201,8 +201,8 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 		// create bind mount
 		options := []string{"bind"}
-		klog.V(4).Infof("NodePublishVolume - creating bind mount [%v] -> [%v]", targetPath, hostVolPath)
-		if err := mounter.Mount(hostVolPath, targetPath, "", options); err != nil {
+		klog.Infof("NodePublishVolume - creating bind mount [%v] -> [%v]", targetPath, hostVolPath)
+		if err := mounter.Mount(volPathInContainer, targetPath, "", options); err != nil {
 			klog.Errorf("NodePublishVolume - mounting [%s] at [%s] failed with error [%v]", hostVolPath, targetPath, err)
 			return nil, fmt.Errorf("NodePublishVolume - mounting [%s] at [%s] failed with error [%v]", hostVolPath, targetPath, err)
 		}
