@@ -714,7 +714,7 @@ func (d *dingofs) UnmountAndDelete(ctx context.Context, targetPath string, force
 			klog.Errorf("unmount [%s] failed with error [%v]", targetPath, err)
 			return true, nil, status.Error(codes.Internal, fmt.Sprintf("NodeUnpublishVolume - unmount [%s] failed with error [%v]", targetPath, err))
 		}
-		klog.Infof("[%s] %v is unmounted successfully", targetPath)
+		klog.Infof("[%s] is unmounted successfully", targetPath)
 	}
 	// Delete the mount point
 	if err = os.Remove(targetPath); err != nil {
@@ -723,7 +723,7 @@ func (d *dingofs) UnmountAndDelete(ctx context.Context, targetPath string, force
 			klog.Infof("targetPath [%s] is not present", targetPath)
 			return false, nil, nil
 		}
-		klog.Infof("[%s] mount point:[%s] removal failed with error [%v]", targetPath, err)
+		klog.Infof("mount point:[%s] removal failed with error [%v]", targetPath, err)
 		return true, nil, status.Error(codes.Internal, fmt.Sprintf("NodeUnpublishVolume - mount point [%s] removal failed with error [%v]", targetPath, err))
 	}
 	klog.Infof("Path [%s] is deleted", targetPath)
