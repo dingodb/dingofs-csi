@@ -1,20 +1,20 @@
 /*
-Copyright 2022 The Curve Authors
+ * Copyright (c) 2025 dingodb.com, Inc. All Rights Reserved
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
-package curvefsdriver
+package util
 
 import (
 	"fmt"
@@ -26,7 +26,6 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/jackblack369/dingofs-csi/pkg/util"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -34,15 +33,14 @@ import (
 const (
 	defaultToolExampleConfPath   = "/dingofs/conf/tools.conf"
 	defaultClientExampleConfPath = "/dingofs/conf/client.conf"
-	// toolPath                     = "/dingofs/tools/sbin/dingofs_tool"
-	toolPath       = "/dingofs/tools-v2/sbin/dingo"
-	clientPath     = "/dingofs/client/sbin/dingo-fuse"
-	cacheDirPrefix = "/dingofs/client/data/cache/"
-	PodMountBase   = "/dfs"
-	MountBase      = "/var/lib/dfs"
+	toolPath                     = "/dingofs/tools-v2/sbin/dingo"
+	clientPath                   = "/dingofs/client/sbin/dingo-fuse"
+	cacheDirPrefix               = "/dingofs/client/data/cache/"
+	PodMountBase                 = "/dfs"
+	MountBase                    = "/var/lib/dfs"
 )
 
-type curvefsTool struct {
+type dingofsTool struct {
 	ToolParams  map[string]string
 	QuotaParams map[string]string
 }
@@ -53,13 +51,11 @@ type FsInfo struct {
 	Status string `json:"status"`
 }
 
-var fss = map[string]string{}
-
-func NewCurvefsTool() *curvefsTool {
-	return &curvefsTool{ToolParams: map[string]string{}, QuotaParams: map[string]string{}}
+func NewDingofsTool() *dingofsTool {
+	return &dingofsTool{ToolParams: map[string]string{}, QuotaParams: map[string]string{}}
 }
 
-func (ct *curvefsTool) CreateFs(
+func (ct *dingofsTool) CreateFsV1(
 	params map[string]string,
 	secrets map[string]string,
 ) error {
@@ -69,7 +65,7 @@ func (ct *curvefsTool) CreateFs(
 	//	return nil
 	//}
 
-	err := ct.ValidateCommonParamsV2(secrets)
+	err := ct.ValidateCommonParams(secrets)
 	if err != nil {
 		return err
 	}
@@ -86,12 +82,12 @@ func (ct *curvefsTool) CreateFs(
 	}
 
 	klog.Infof("check fs [%s] not existed, begin create fs [%s]", fsName, fsName)
-	err = ct.ValidateCreateFsParamsV2(secrets)
+	err = ct.ValidateCreateFsParams(secrets)
 	if err != nil {
 		return err
 	}
 	ct.ToolParams["fsname"] = fsName
-	// call curvefs create fs to create a fs
+	// call dingofs create fs to create a fs
 	createFsArgs := []string{"create", "fs"}
 	for k, v := range ct.ToolParams {
 		arg := fmt.Sprintf("--%s=%s", k, v)
@@ -156,14 +152,14 @@ func (ct *curvefsTool) CreateFs(
 	return nil
 }
 
-func (ct *curvefsTool) DeleteFs(volumeID string, params map[string]string) error {
-	err := ct.validateCommonParams(params)
+func (ct *dingofsTool) DeleteFs(volumeID string, params map[string]string) error {
+	err := ct.ValidateCommonParams(params)
 	if err != nil {
 		return err
 	}
 	ct.ToolParams["fsname"] = volumeID // todo change to fsName
 	ct.ToolParams["noconfirm"] = "1"
-	// call curvefs_tool delete-fs to create a fs
+	// call dingo tool delete-fs to create a fs
 	deleteFsArgs := []string{"delete-fs"}
 	for k, v := range ct.ToolParams {
 		arg := fmt.Sprintf("-%s=%s", k, v)
@@ -174,7 +170,7 @@ func (ct *curvefsTool) DeleteFs(volumeID string, params map[string]string) error
 	if err != nil {
 		return status.Errorf(
 			codes.Internal,
-			"curvefs_tool delete-fs failed. cmd:%s %v, output: %s, err: %v",
+			"dingo tool delete-fs failed. cmd:%s %v, output: %s, err: %v",
 			toolPath,
 			deleteFsArgs,
 			output,
@@ -184,7 +180,7 @@ func (ct *curvefsTool) DeleteFs(volumeID string, params map[string]string) error
 	return nil
 }
 
-func (ct *curvefsTool) CheckFsExisted(fsName string, mdsAddr string) (bool, error) {
+func (ct *dingofsTool) CheckFsExisted(fsName string, mdsAddr string) (bool, error) {
 	listFsArgs := []string{"list", "fs", "--mdsaddr=" + mdsAddr}
 	listFsCmd := exec.Command(toolPath, listFsArgs...)
 	fsInfos, err := listFsCmd.CombinedOutput()
@@ -210,7 +206,7 @@ func (ct *curvefsTool) CheckFsExisted(fsName string, mdsAddr string) (bool, erro
 		if len(fields) < 3 {
 			continue
 		}
-		id := util.ParseInt(fields[1])
+		id := ParseInt(fields[1])
 		fsInfo := FsInfo{
 			ID:     id,
 			Name:   fields[3],
@@ -228,9 +224,9 @@ func (ct *curvefsTool) CheckFsExisted(fsName string, mdsAddr string) (bool, erro
 	return false, nil
 }
 
-func (ct *curvefsTool) SetVolumeQuota(mdsaddr string, path string, fsname string, capacity string, inodes string) error {
+func (ct *dingofsTool) SetVolumeQuota(mdsaddr string, path string, fsname string, capacity string, inodes string) error {
 	klog.Infof("set volume quota, mdsaddr: %s, path: %s, fsname: %s, capacity: %s, inodes: %s", mdsaddr, path, fsname, capacity, inodes)
-	// call curvefs set quota to set volume quota
+	// call dingofs set quota to set volume quota
 	setQuotaArgs := []string{"quota", "set", "--mdsaddr=" + mdsaddr, "--path=" + path, "--fsname=" + fsname, "--capacity=" + capacity}
 	if strings.TrimSpace(inodes) != "" {
 		setQuotaArgs = append(setQuotaArgs, "--inodes="+inodes)
@@ -250,21 +246,7 @@ func (ct *curvefsTool) SetVolumeQuota(mdsaddr string, path string, fsname string
 	return nil
 }
 
-func (ct *curvefsTool) validateCommonParams(params map[string]string) error {
-	if mdsAddr, ok := params["mdsAddr"]; ok {
-		ct.ToolParams["mdsAddr"] = mdsAddr
-	} else {
-		return status.Error(codes.InvalidArgument, "mdsAddr is missing")
-	}
-	if confPath, ok := params["toolConfPath"]; ok {
-		ct.ToolParams["confPath"] = confPath
-	} else {
-		ct.ToolParams["confPath"] = defaultToolExampleConfPath
-	}
-	return nil
-}
-
-func (ct *curvefsTool) ValidateCommonParamsV2(params map[string]string) error {
+func (ct *dingofsTool) ValidateCommonParams(params map[string]string) error {
 	if mdsAddr, ok := params["mdsAddr"]; ok {
 		ct.ToolParams["mdsaddr"] = mdsAddr
 	} else {
@@ -273,95 +255,67 @@ func (ct *curvefsTool) ValidateCommonParamsV2(params map[string]string) error {
 	return nil
 }
 
-func (ct *curvefsTool) validateCreateFsParams(params map[string]string) error {
-	if fsType, ok := params["fsType"]; ok {
-		ct.ToolParams["fsType"] = fsType
-		enableSumInDir, ok := params["enableSumInDir"]
-		if ok {
-			ct.ToolParams["enableSumInDir"] = enableSumInDir
-		} else {
-			ct.ToolParams["enableSumInDir"] = "0"
-		}
-		if fsType == "s3" {
-			s3Endpoint, ok1 := params["s3Endpoint"]
-			s3AccessKey, ok2 := params["s3AccessKey"]
-			s3SecretKey, ok3 := params["s3SecretKey"]
-			s3Bucket, ok4 := params["s3Bucket"]
-			if ok1 && ok2 && ok3 && ok4 {
-				ct.ToolParams["s3_endpoint"] = s3Endpoint
-				ct.ToolParams["s3_ak"] = s3AccessKey
-				ct.ToolParams["s3_sk"] = s3SecretKey
-				ct.ToolParams["s3_bucket_name"] = s3Bucket
-			} else {
-				return status.Error(codes.InvalidArgument, "s3Info is incomplete")
-			}
-		} else if fsType == "volume" {
-			if backendVolName, ok := params["backendVolName"]; ok {
-				ct.ToolParams["volumeName"] = backendVolName
-			} else {
-				return status.Error(codes.InvalidArgument, "backendVolName is missing")
-			}
-			if backendVolSizeGB, ok := params["backendVolSizeGB"]; ok {
-				backendVolSizeGBInt, err := strconv.ParseInt(backendVolSizeGB, 0, 64)
-				if err != nil {
-					return status.Error(codes.InvalidArgument, "backendVolSize is not integer")
-				}
-				if backendVolSizeGBInt < 10 {
-					return status.Error(codes.InvalidArgument, "backendVolSize must larger than 10GB")
-				}
-				ct.ToolParams["volumeSize"] = backendVolSizeGB
-			} else {
-				return status.Error(codes.InvalidArgument, "backendVolSize is missing")
-			}
-		} else {
-			return status.Errorf(codes.InvalidArgument, "unsupported fsType %s", fsType)
-		}
-	} else {
-		return status.Error(codes.InvalidArgument, "fsType is missing")
-	}
-	return nil
-}
-
-func (ct *curvefsTool) ValidateCreateFsParamsV2(params map[string]string) error {
-	if fsType, ok := params["fsType"]; ok {
+func (ct *dingofsTool) ValidateCreateFsParams(params map[string]string) error {
+	var fsType, storagetype string
+	if value, ok := params["fsType"]; ok {
+		fsType = value
 		ct.ToolParams["fstype"] = fsType
+	}
+	if value, ok := params["storagetype"]; ok {
+		storagetype = value
+		ct.ToolParams["storagetype"] = storagetype
+	}
+	klog.Infof("validate create fs type, fsType: [%s], storagetype: [%s]", fsType, storagetype)
 
-		if fsType == "s3" {
-			s3Endpoint, ok1 := params["s3Endpoint"]
-			s3AccessKey, ok2 := params["s3AccessKey"]
-			s3SecretKey, ok3 := params["s3SecretKey"]
-			s3Bucket, ok4 := params["s3Bucket"]
-			if ok1 && ok2 && ok3 && ok4 {
-				ct.ToolParams["s3.endpoint"] = s3Endpoint
-				ct.ToolParams["s3.ak"] = s3AccessKey
-				ct.ToolParams["s3.sk"] = s3SecretKey
-				ct.ToolParams["s3.bucketname"] = s3Bucket
-			} else {
-				return status.Error(codes.InvalidArgument, "s3Info is incomplete")
-			}
-		} else if fsType == "volume" {
-			if backendVolName, ok := params["backendVolName"]; ok {
-				ct.ToolParams["volumeName"] = backendVolName
-			} else {
-				return status.Error(codes.InvalidArgument, "backendVolName is missing")
-			}
-			if backendVolSizeGB, ok := params["backendVolSizeGB"]; ok {
-				backendVolSizeGBInt, err := strconv.ParseInt(backendVolSizeGB, 0, 64)
-				if err != nil {
-					return status.Error(codes.InvalidArgument, "backendVolSize is not integer")
-				}
-				if backendVolSizeGBInt < 10 {
-					return status.Error(codes.InvalidArgument, "backendVolSize must larger than 10GB")
-				}
-				ct.ToolParams["volumeSize"] = backendVolSizeGB
-			} else {
-				return status.Error(codes.InvalidArgument, "backendVolSize is missing")
-			}
+	if fsType == "s3" || storagetype == "s3" {
+		s3Endpoint, ok1 := params["s3Endpoint"]
+		s3AccessKey, ok2 := params["s3AccessKey"]
+		s3SecretKey, ok3 := params["s3SecretKey"]
+		s3Bucket, ok4 := params["s3Bucket"]
+		if ok1 && ok2 && ok3 && ok4 {
+			ct.ToolParams["s3.endpoint"] = s3Endpoint
+			ct.ToolParams["s3.ak"] = s3AccessKey
+			ct.ToolParams["s3.sk"] = s3SecretKey
+			ct.ToolParams["s3.bucketname"] = s3Bucket
 		} else {
-			return status.Errorf(codes.InvalidArgument, "unsupported fsType %s", fsType)
+			return status.Error(codes.InvalidArgument, "s3Info is incomplete")
+		}
+	} else if fsType == "rados" || storagetype == "rados" {
+		if radosClusterName, ok1 := params["radosClustername"]; ok1 {
+			ct.ToolParams["rados.clustername"] = radosClusterName
+		}
+		radosPoolName, ok2 := params["radosPoolname"]
+		radosUserName, ok3 := params["radosUsername"]
+		radosUserKey, ok4 := params["radosKey"]
+		radosMon, ok5 := params["radosMon"]
+		if ok2 && ok3 && ok4 && ok5 {
+			ct.ToolParams["rados.poolname"] = radosPoolName
+			ct.ToolParams["rados.username"] = radosUserName
+			ct.ToolParams["rados.key"] = radosUserKey
+			ct.ToolParams["rados.mon"] = radosMon
+		} else {
+			return status.Error(codes.InvalidArgument, "radosInfo is incomplete")
+		}
+	} else if fsType == "volume" {
+		if backendVolName, ok := params["backendVolName"]; ok {
+			ct.ToolParams["volumeName"] = backendVolName
+		} else {
+			return status.Error(codes.InvalidArgument, "backendVolName is missing")
+		}
+		if backendVolSizeGB, ok := params["backendVolSizeGB"]; ok {
+			backendVolSizeGBInt, err := strconv.ParseInt(backendVolSizeGB, 0, 64)
+			if err != nil {
+				return status.Error(codes.InvalidArgument, "backendVolSize is not integer")
+			}
+			if backendVolSizeGBInt < 10 {
+				return status.Error(codes.InvalidArgument, "backendVolSize must larger than 10GB")
+			}
+			ct.ToolParams["volumeSize"] = backendVolSizeGB
+		} else {
+			return status.Error(codes.InvalidArgument, "backendVolSize is missing")
 		}
 	} else {
-		return status.Error(codes.InvalidArgument, "fsType is missing")
+		return status.Errorf(codes.InvalidArgument, "unsupported fsType %s", fsType)
 	}
 
 	if quotaCapacity, ok := params["quotaCapacity"]; ok {
@@ -375,15 +329,19 @@ func (ct *curvefsTool) ValidateCreateFsParamsV2(params map[string]string) error 
 	return nil
 }
 
-type curvefsMounter struct {
+type dingofsMounter struct {
 	mounterParams map[string]string
 }
 
-func NewCurvefsMounter() *curvefsMounter {
-	return &curvefsMounter{mounterParams: map[string]string{}}
+func (cm *dingofsMounter) GetCacheDir() string {
+	return cm.mounterParams["cache_dir"]
 }
 
-func (cm *curvefsMounter) MountFs(
+func NewDingofsMounter() *dingofsMounter {
+	return &dingofsMounter{mounterParams: map[string]string{}}
+}
+
+func (cm *dingofsMounter) MountFs(
 	mountPath string,
 	params map[string]string,
 	mountOption *csi.VolumeCapability_MountVolume,
@@ -411,7 +369,7 @@ func (cm *curvefsMounter) MountFs(
 	}
 
 	cm.mounterParams["fsname"] = fsname
-	// curve-fuse -o default_permissions -o allow_other \
+	// dingo-fuse -o default_permissions -o allow_other \
 	//  -o conf=/etc/dingofs/client.conf -o fsname=testfs \
 	//  -o fstype=s3  --mdsAddr=1.1.1.1 <mountpoint>
 	var mountFsArgs []string
@@ -439,7 +397,7 @@ func (cm *curvefsMounter) MountFs(
 
 	mountFsArgs = append(mountFsArgs, mountPath)
 
-	err = util.CreatePath(mountPath)
+	err = CreatePath(mountPath)
 	if err != nil {
 		return 0, status.Errorf(
 			codes.Internal,
@@ -449,13 +407,13 @@ func (cm *curvefsMounter) MountFs(
 		)
 	}
 
-	klog.V(3).Infof("curve-fuse mountFsArgs: %s", mountFsArgs)
+	klog.V(3).Infof("dingo-fuse mountFsArgs: %s", mountFsArgs)
 	mountFsCmd := exec.Command(clientPath, mountFsArgs...)
 	output, err := mountFsCmd.CombinedOutput()
 	if err != nil {
 		return 0, status.Errorf(
 			codes.Internal,
-			"curve-fuse mount failed. cmd: %s %v, output: %s, err: %v",
+			"dingo-fuse mount failed. cmd: %s %v, output: %s, err: %v",
 			clientPath,
 			mountFsArgs,
 			output,
@@ -464,11 +422,11 @@ func (cm *curvefsMounter) MountFs(
 	}
 	// get command process id
 	pid := mountFsCmd.Process.Pid
-	klog.V(1).Infof("curve-fuse mount success, pid: %d", pid+2)
+	klog.V(1).Infof("dingo-fuse mount success, pid: %d", pid+2)
 	return pid + 2, nil
 }
 
-func (cm *curvefsMounter) UmountFs(targetPath string, mountUUID string, cacheDirs string) error {
+func (cm *dingofsMounter) UmountFs(targetPath string, mountUUID string, cacheDirs string) error {
 	// umount TargetCmd volume /var/lib/kubelet/pods/15c066c3-3399-42c6-be63-74c95aa97eba/volumes/kubernetes.io~csi/pvc-c1b121a6-a698-4b5e-b847-c4c2ea110dee/mount
 	umountTargetCmd := exec.Command("umount", targetPath)
 	output, err := umountTargetCmd.CombinedOutput()
@@ -513,7 +471,7 @@ func (cm *curvefsMounter) UmountFs(targetPath string, mountUUID string, cacheDir
 }
 
 // update the configuration file with the mount flags
-func (cm *curvefsMounter) applyMountFlags(
+func (cm *dingofsMounter) applyMountFlags(
 	origConfPath string,
 	mountFlags []string,
 	mountUUID string,
@@ -637,7 +595,7 @@ func (cm *curvefsMounter) applyMountFlags(
 	return confPath, nil
 }
 
-func (cm *curvefsMounter) validateMountFsParams(params map[string]string) error {
+func (cm *dingofsMounter) validateMountFsParams(params map[string]string) error {
 	if mdsAddr, ok := params["mdsAddr"]; ok {
 		cm.mounterParams["mdsaddr"] = mdsAddr
 	} else {
@@ -657,7 +615,7 @@ func (cm *curvefsMounter) validateMountFsParams(params map[string]string) error 
 }
 
 // GetDfsID get fsId from result of `dingo query fs --fsname test1`
-func (ct *curvefsTool) GetDfsID(name string) (string, error) {
+func (ct *dingofsTool) GetDfsID(name string) (string, error) {
 	// todo get UUID from dingofs
 	return "", nil
 }

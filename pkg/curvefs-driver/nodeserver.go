@@ -54,7 +54,7 @@ func (ns *nodeServer) NodePublishVolume(
 	if !util.ValidateCharacter([]string{targetPath}) {
 		return nil, status.Errorf(codes.InvalidArgument, "Illegal TargetPath: %s", targetPath)
 	}
-	mountPath := filepath.Join(PodMountBase, mountUUID)
+	mountPath := filepath.Join(util.PodMountBase, mountUUID)
 	isNotMounted, _ := mount.IsNotMountPoint(ns.mounter, mountPath)
 	if !isNotMounted {
 		klog.V(5).Infof("%s is already mounted", mountPath)
@@ -63,13 +63,13 @@ func (ns *nodeServer) NodePublishVolume(
 
 	secrets := req.Secrets
 
-	curvefsTool := NewCurvefsTool()
-	err := curvefsTool.CreateFs(volumeContext, secrets)
+	curvefsTool := util.NewDingofsTool()
+	err := curvefsTool.CreateFsV1(volumeContext, secrets)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Create fs failed: %v", err)
 	}
 
-	curvefsMounter := NewCurvefsMounter()
+	curvefsMounter := util.NewDingofsMounter()
 
 	klog.V(1).Infof("mountPath: %s", mountPath)
 	mountOption := req.GetVolumeCapability().GetMount()
@@ -92,7 +92,7 @@ func (ns *nodeServer) NodePublishVolume(
 		)
 	}
 
-	dataPath := filepath.Join(PodMountBase, mountUUID, volumeID)
+	dataPath := filepath.Join(util.PodMountBase, mountUUID, volumeID)
 	err = util.CreatePath(dataPath)
 	if err != nil {
 		return nil, status.Errorf(
@@ -116,7 +116,7 @@ func (ns *nodeServer) NodePublishVolume(
 	ns.mountRecord[targetPath] = map[string]string{
 		"mountUUID": mountUUID,
 		"pid":       strconv.Itoa(pid),
-		"cacheDirs": curvefsMounter.mounterParams["cache_dir"],
+		"cacheDirs": curvefsMounter.GetCacheDir(),
 	}
 
 	// bind data path to target path
@@ -171,7 +171,7 @@ func (ns *nodeServer) NodeUnpublishVolume(
 		return &csi.NodeUnpublishVolumeResponse{}, nil
 	}
 
-	curvefsMounter := NewCurvefsMounter()
+	curvefsMounter := util.NewDingofsMounter()
 	mountUUID := ns.mountRecord[targetPath]["mountUUID"]
 	cacheDirs := ns.mountRecord[targetPath]["cacheDirs"]
 	err := curvefsMounter.UmountFs(targetPath, mountUUID, cacheDirs)

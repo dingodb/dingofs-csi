@@ -16,7 +16,6 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/jackblack369/dingofs-csi/pkg/builder"
 	"github.com/jackblack369/dingofs-csi/pkg/config"
-	curvefsdriver "github.com/jackblack369/dingofs-csi/pkg/curvefs-driver"
 	"github.com/jackblack369/dingofs-csi/pkg/k8sclient"
 	"github.com/jackblack369/dingofs-csi/pkg/util"
 	"github.com/jackblack369/dingofs-csi/pkg/util/resource"
@@ -606,16 +605,14 @@ func (d *dingofs) AuthFs(ctx context.Context, secrets map[string]string, setting
 func (d *dingofs) CreateFS(
 	secrets map[string]string,
 ) error {
-	if secrets["s3Bucket"] == "" {
-		klog.Info("DfsMount: bucket is empty")
-	}
+
 	fsName := secrets["name"]
 	//if _, ok := fss[fsName]; ok {
 	//	klog.Infof("file system: %s has beed already created", fsName)
 	//	return nil
 	//}
-	ct := curvefsdriver.NewCurvefsTool()
-	err := ct.ValidateCommonParamsV2(secrets)
+	ct := util.NewDingofsTool()
+	err := ct.ValidateCommonParams(secrets)
 	if err != nil {
 		return err
 	}
@@ -630,7 +627,7 @@ func (d *dingofs) CreateFS(
 		return nil
 	}
 
-	err = ct.ValidateCreateFsParamsV2(secrets)
+	err = ct.ValidateCreateFsParams(secrets)
 	if err != nil {
 		return err
 	}
@@ -643,7 +640,7 @@ func (d *dingofs) CreateFS(
 		createFsArgs = append(createFsArgs, arg)
 	}
 
-	klog.Infof("create fs, createFsArgs: %v", createFsArgs)
+	klog.V(1).Infof("create fs, createFsArgs: %v", createFsArgs)
 	createFsCmd := exec.Command(config.DfsCMDPath, createFsArgs...) //
 	output, err := createFsCmd.CombinedOutput()
 	klog.Infof("create fs, output: %s", output)
