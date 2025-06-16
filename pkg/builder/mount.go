@@ -490,6 +490,7 @@ func (p *PodMount) DUmount(ctx context.Context, target, podName string) error {
 		if err != nil {
 			return err
 		}
+		klog.Info("begin clean reference service")
 		if !shouldDelay {
 			// do not set delay delete, delete it now
 			klog.Info("pod has no dingofs- refs. delete it.", "podName", podName)
@@ -516,7 +517,7 @@ func (p *PodMount) DUmount(ctx context.Context, target, podName string) error {
 			serviceName := fmt.Sprintf("%s-%s-metrics", config.NodeName, serviceUniqueId)
 			if err := p.K8sClient.DeleteService(ctx, serviceName, po.Namespace); !k8serrors.IsNotFound(err) && err != nil {
 				// do not return err if delete service failed
-				klog.V(1).Info("Delete service error", "serviceName", serviceName, "error", err)
+				klog.ErrorS(err, "Delete service [%s] error", serviceName)
 			}
 		}
 		return nil
