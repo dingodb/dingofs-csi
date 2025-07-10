@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: dynamic-pvc-1
+  name: dingofs-dynamic-pvc
   namespace: dingofs
 spec:
   accessModes:
   - ReadWriteMany
   resources:
     requests:
-      storage: 10Gi
-  storageClassName: dingofs-sc
+      storage: 100Gi
+  storageClassName: dingofs-sc-s3

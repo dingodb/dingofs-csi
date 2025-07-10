@@ -40,6 +40,7 @@ var (
 	provisioner        bool
 	cacheConf          bool
 	podManager         bool
+	localPV            bool
 	reconcilerInterval int
 
 	leaderElection              bool
@@ -85,6 +86,7 @@ func main() {
 	// node flags
 	cmd.Flags().BoolVar(&podManager, "enable-manager", false, "Enable pod manager in csi node. default false.")
 	cmd.Flags().IntVar(&reconcilerInterval, "reconciler-interval", 5, "interval (default 5s) for reconciler")
+	cmd.Flags().BoolVar(&localPV, "local-pv", false, "Enable local pv mode. default false.")
 
 	goFlag := flag.CommandLine
 	klog.InitFlags(goFlag)

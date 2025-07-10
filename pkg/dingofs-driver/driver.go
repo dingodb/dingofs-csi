@@ -152,7 +152,7 @@ func parseNodeConfig() {
 	if err != nil {
 		klog.ErrorS(err, "Failed to marshal volume mounts to JSON")
 	} else {
-		klog.V(5).Infof("csi-driver volume mounts JSON: %s", string(volumeMountsJSON))
+		klog.V(6).Infof("csi-driver volume mounts JSON: %s", string(volumeMountsJSON))
 	}
 	volumeJSON, err := json.MarshalIndent(pod.Spec.Volumes, "", "  ")
 	if err != nil {

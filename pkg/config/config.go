@@ -39,6 +39,7 @@ var (
 	Immutable       = false // csi driver is running in an immutable environment
 	Provisioner     = false // provisioner in controller
 	CacheClientConf = false // cache client config files and use directly in mount containers
+	LocalPV         = false // local pv mode, use hostPath to mount volume
 
 	DFSConfigPath            = "/var/lib/dingofs/config"
 	DFSMountPriorityName     = "system-node-critical"
@@ -158,6 +159,7 @@ const (
 	DefaultClientCommonLogDirVal = "/dingofs/client/logs"
 
 	// local pv
-	MountPathLength = 6
-	HostDir         = "/host"
+	MountPathLength    = 6
+	HostContainerDir   = "/host"
+	DefaultHostDfsPath = "/dingofs"
 )

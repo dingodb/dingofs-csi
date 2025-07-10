@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -163,20 +164,33 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 
 	secrets := req.Secrets
-	if secrets == nil {
-		// use local pv
-		klog.Infof("secrets is nil, use local pv")
-		dfsVol, err := util.GetDfsInfo(volumeID)
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, "NodePublishVolume : volumeID is not in proper format")
-		}
+	if secrets == nil || config.LocalPV {
 
-		hostVolPath := dfsVol.MountPath
-		volPathInContainer := config.HostDir + hostVolPath
-		_, err = os.Lstat(volPathInContainer)
-		if err != nil {
-			klog.Errorf("NodePublishVolume - lstat [%s] failed with error [%v]", volPathInContainer, err)
-			return nil, fmt.Errorf("NodePublishVolume - lstat [%s] failed with error [%v]", volPathInContainer, err)
+		hostVolPath := ""
+		if secrets != nil {
+			subPath := strings.TrimPrefix(volumeID, "pvc-")
+			hostVolPath = filepath.Join(config.DefaultHostDfsPath, secrets["name"], subPath)
+		} else {
+			dfsVol, err := util.GetDfsInfo(volumeID)
+			if err != nil {
+				return nil, status.Error(codes.InvalidArgument, "NodePublishVolume : volumeID is not in proper format")
+			}
+			hostVolPath = dfsVol.MountPath
+		}
+		// use local pv
+		klog.Infof("use local pv mode, volumeID: %s, targetPath: %s, hostPath: %s", volumeID, targetPath, hostVolPath)
+
+		volPathInContainer := config.HostContainerDir + hostVolPath
+		//_, err = os.Lstat(volPathInContainer)
+		//if err != nil {
+		//	klog.Errorf("NodePublishVolume - lstat [%s] failed with error [%v]", volPathInContainer, err)
+		//	return nil, fmt.Errorf("NodePublishVolume - lstat [%s] failed with error [%v]", volPathInContainer, err)
+		//}
+		if _, err := os.Stat(volPathInContainer); os.IsNotExist(err) {
+			klog.Infof("NodePublishVolume - creating directory [%s] for local pv", volPathInContainer)
+			if err := os.MkdirAll(volPathInContainer, os.FileMode(0755)); err != nil {
+				return nil, fmt.Errorf("NodePublishVolume - create [%s] failed with error [%v]", volPathInContainer, err)
+			}
 		}
 
 		mounter := &mount.Mounter{}
@@ -198,6 +212,9 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 			klog.Infof("NodePublishVolume - [%s] is already a mount point", targetPath)
 			return &csi.NodePublishVolumeResponse{}, nil
 		}
+
+		// check current host is running current dingofs mount system service , if not, bootstrap this dingofs mount system service used by job
+		// TODO
 
 		// create bind mount
 		options := []string{"bind"}

@@ -20,6 +20,7 @@ import (
 )
 
 func parseNodeConfig() {
+	config.LocalPV = localPV
 	if os.Getenv("DRIVER_NAME") != "" {
 		config.DriverName = os.Getenv("DRIVER_NAME")
 	}
