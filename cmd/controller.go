@@ -44,6 +44,7 @@ func init() {
 func parseControllerConfig() {
 	config.Provisioner = provisioner
 	config.CacheClientConf = cacheConf
+	config.LocalPV = localPV
 	if os.Getenv("DRIVER_NAME") != "" {
 		config.DriverName = os.Getenv("DRIVER_NAME")
 	}

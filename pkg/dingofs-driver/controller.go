@@ -56,7 +56,7 @@ func newControllerService(k8sClient *k8sclient.K8sClient) (controllerService, er
 func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	log := klog.NewKlogr().WithName("CreateVolume")
 	// DEBUG only, secrets exposed in args
-	// klog.Infof("CreateVolume: called with args: %#v", req)
+	klog.Infof("CreateVolume: called with args: %#v", req)
 
 	if len(req.Name) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume Name cannot be empty")
@@ -72,7 +72,7 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	volumeId := req.Name
-	subPath := req.Name
+	subPath := strings.TrimPrefix(req.Name, "pvc-")
 	secrets := req.Secrets
 	log.Info("Secrets contains keys", "secretKeys", reflect.ValueOf(secrets).MapKeys())
 
@@ -97,10 +97,10 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		}
 	}
 	// create volume
-	//err := d.dingofs.DfsCreateVol(ctx, volumeId, subPath, secrets, volCtx)
-	//if err != nil {
-	//	return nil, status.Errorf(codes.Internal, "Could not createVol in dingofs: %v", err)
-	//}
+	err := d.provider.DfsCreateVol(ctx, volumeId, subPath, secrets, volCtx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Could not createVol in dingofs: %v", err)
+	}
 
 	// check if use pathpattern
 	if req.Parameters["pathPattern"] != "" {

@@ -37,7 +37,7 @@ import (
 type Provider interface {
 	mount.Interface
 	DfsMount(ctx context.Context, volumeID string, target string, secrets, volCtx map[string]string, mountOptions []string) (DfsInterface, error)
-	// DfsCreateVol(ctx context.Context, volumeID string, subPath string, secrets, volCtx map[string]string) error
+	DfsCreateVol(ctx context.Context, volumeID string, subPath string, secrets, volCtx map[string]string) error
 	DfsDeleteVol(ctx context.Context, volumeID string, target string, secrets, volCtx map[string]string, options []string) error
 	DfsUnmount(ctx context.Context, volumeID, mountPath string) error
 	DfsCleanupMountPoint(ctx context.Context, mountPath string) error
@@ -292,6 +292,29 @@ func (d *dingofs) GetDfsVolUUID(ctx context.Context, dfsSetting *config.DfsSetti
 	}
 
 	return idStrs[3], nil
+}
+
+func (d *dingofs) DfsCreateVol(ctx context.Context, volumeID string, subPath string, secrets, volCtx map[string]string) error {
+	//jfsSetting, err := j.genJfsSettings(ctx, volumeID, "", secrets, volCtx, []string{})
+	//if err != nil {
+	//	return err
+	//}
+	//jfsSetting.SubPath = subPath
+	//jfsSetting.MountPath = filepath.Join(config.TmpPodMountBase, jfsSetting.VolumeId)
+	//return d.podMount.DCreateVolume(ctx, jfsSetting)
+	fsName := secrets["name"]
+	rootFSPath := filepath.Join(config.HostContainerDir+config.DefaultHostDfsPath, fsName)
+	containerHostPath := filepath.Join(rootFSPath, subPath)
+	if _, err := os.Stat(containerHostPath); os.IsNotExist(err) {
+		klog.Infof("creating sub directory [%s] in host dingofs", containerHostPath)
+		if err := os.MkdirAll(containerHostPath, os.FileMode(0755)); err != nil {
+			return fmt.Errorf("create [%s] failed with error [%v]", containerHostPath, err)
+		}
+		// TODO config subPath quota
+	}
+
+	klog.Infof("DfsCreateVol finished, volumeID: %s, subPath: %s", volumeID, containerHostPath)
+	return nil
 }
 
 func (d *dingofs) DfsDeleteVol(ctx context.Context, volumeID string, subPath string, secrets, volCtx map[string]string, options []string) error {

@@ -143,6 +143,25 @@ func (p *provisionerService) Provision(ctx context.Context, options provisioncon
 	for k, v := range scParams {
 		volCtx[k] = v
 	}
+
+	secret, err := p.K8sClient.GetSecret(ctx, scParams[config.ProvisionerSecretName], scParams[config.ProvisionerSecretNamespace])
+	if err != nil {
+		provisionerLog.Error(err, "Get Secret error")
+		return nil, provisioncontroller.ProvisioningFinished, errors.New("unable to provision new pv: " + err.Error())
+	}
+
+	secretData := make(map[string]string)
+	for k, v := range secret.Data {
+		secretData[k] = string(v)
+	}
+
+	// create the subPath directory immediately in the filesystem
+	provisionerLog.V(1).Info("Creating subPath in DingoFS", "subPath", subPath, "pvName", pvName, "secretNamespace", secret.Namespace, "secretName", secret.Name, "sercetData", secretData)
+
+	if err := p.provider.DfsCreateVol(ctx, pvName, subPath, secretData, volCtx); err != nil {
+		provisionerLog.Error(err, "Failed to create subPath in DingoFS", "subPath", subPath)
+		return nil, provisioncontroller.ProvisioningFinished, err
+	}
 	pv := &corev1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: options.PVName,
@@ -179,11 +198,6 @@ func (p *provisionerService) Provision(ctx context.Context, options provisioncon
 	}
 
 	if pv.Spec.PersistentVolumeReclaimPolicy == corev1.PersistentVolumeReclaimDelete && options.StorageClass.Parameters["secretFinalizer"] == "true" {
-		secret, err := p.K8sClient.GetSecret(ctx, scParams[config.ProvisionerSecretName], scParams[config.ProvisionerSecretNamespace])
-		if err != nil {
-			provisionerLog.Error(err, "Get Secret error")
-			return nil, provisioncontroller.ProvisioningFinished, errors.New("unable to provision new pv: " + err.Error())
-		}
 
 		provisionerLog.V(1).Info("Add Finalizer", "namespace", secret.Namespace, "name", secret.Name)
 		err = resource.AddSecretFinalizer(ctx, p.K8sClient, secret, config.Finalizer)
