@@ -1,5 +1,5 @@
 CSI_IMAGE_NAME ?= dingodatabase/dingofs-csi
-DRIVER_VERSION ?= v1.0.0
+DRIVER_VERSION ?= v3.1.0
 LAST_COMMIT ?= $(shell git rev-parse --short HEAD)
 BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
