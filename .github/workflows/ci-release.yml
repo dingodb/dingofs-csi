@@ -10,7 +10,6 @@ jobs:
   build:
     if: ${{ !startsWith(github.ref, 'refs/heads/gh-readonly-queue/') }}
     runs-on: ubuntu-latest
-    container: dingodatabase/dingo-base:rocky9
 
     steps:
       - name: Checkout
@@ -38,6 +37,11 @@ jobs:
       
       - name: Set Safe Dir
         run: git config --global --add safe.directory $PWD
+
+      - name: Install golang and musl-tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y golang musl-tools
  
       - name: Build binary
         id: build-binary
