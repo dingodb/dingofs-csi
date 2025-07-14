@@ -24,6 +24,9 @@ csi:
 docker-build:
 	docker build --no-cache --platform linux/amd64 -t $(IMAGE_TAG) .
 
+docker-build-offline:
+	docker build --no-cache --platform linux/amd64 -t $(IMAGE_TAG) -f Dockerfile.offline .
+
 docker-push:
 	docker push $(IMAGE_TAG)
 
