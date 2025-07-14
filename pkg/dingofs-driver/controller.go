@@ -102,6 +102,12 @@ func (d *controllerService) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Errorf(codes.Internal, "Could not createVol in dingofs: %v", err)
 	}
 
+	// set subPath quota
+	if err := d.provider.SetQuota(ctx, secrets, nil, path.Join("/", subPath), requiredCap); err != nil {
+		log.Error(err, "Failed to set quota for subPath", "subPath", subPath, "requiredCap", requiredCap)
+		return nil, status.Errorf(codes.Internal, "set quota for subPath %s: %v", subPath, err)
+	}
+
 	// check if use pathpattern
 	if req.Parameters["pathPattern"] != "" {
 		log.Info("volume uses pathPattern, please enable provisioner in CSI Controller, not works in default mode.", "volumeId", volumeId)

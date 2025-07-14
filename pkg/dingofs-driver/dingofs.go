@@ -372,6 +372,8 @@ func (d *dingofs) CreateTarget(ctx context.Context, target string) error {
 	}
 }
 
+// SetQuota sets quota for a DingoFS file system
+// dingo quota set --fsname <fsName> --path /dir --capacity <sizeGiB>
 func (d *dingofs) SetQuota(ctx context.Context, secrets map[string]string, dfsSetting *config.DfsSetting, quotaPath string, capacity int64) error {
 	// TODO modify below logic
 	cap := capacity / 1024 / 1024 / 1024
@@ -379,16 +381,16 @@ func (d *dingofs) SetQuota(ctx context.Context, secrets map[string]string, dfsSe
 		return fmt.Errorf("capacity %d is too small, at least 1GiB for quota", capacity)
 	}
 
-	var args, cmdArgs []string
-	args = []string{"quota", "set", secrets["metaurl"], "--path", quotaPath, "--capacity", strconv.FormatInt(cap, 10)}
-	cmdArgs = []string{config.DfsCMDPath, "quota", "set", "${metaurl}", "--path", quotaPath, "--capacity", strconv.FormatInt(cap, 10)}
+	var args = []string{"quota", "set", "--fsname", secrets["name"], "--path", quotaPath, "--capacity", strconv.FormatInt(cap, 10), "--mdsaddr", secrets["mdsAddr"]}
 
-	klog.Info("quota command:", strings.Join(cmdArgs, " "))
+	klog.Info("quota command:", strings.Join(args, " "))
 	cmdCtx, cmdCancel := context.WithTimeout(ctx, 5*defaultCheckTimeout)
 	defer cmdCancel()
 	envs := syscall.Environ()
-	for key, val := range dfsSetting.Envs {
-		envs = append(envs, fmt.Sprintf("%s=%s", security.EscapeBashStr(key), security.EscapeBashStr(val)))
+	if dfsSetting != nil && dfsSetting.Envs != nil {
+		for key, val := range dfsSetting.Envs {
+			envs = append(envs, fmt.Sprintf("%s=%s", security.EscapeBashStr(key), security.EscapeBashStr(val)))
+		}
 	}
 	var err error
 
