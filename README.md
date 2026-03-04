@@ -12,6 +12,9 @@ The DingoFS CSI Driver implements the CSI specification for container orchestrat
 ```shell
 make csi
 CSI_IMAGE_NAME=<IMAGE_NAME> DRIVER_VERSION=<IMAGE_TAG> make docker-build
+# offline
+CSI_IMAGE_NAME=<IMAGE_NAME> DRIVER_VERSION=<IMAGE_TAG> make docker-build-offline
+
 CSI_IMAGE_NAME=<IMAGE_NAME> DRIVER_VERSION=<IMAGE_TAG> make docker-push
 ```
 
@@ -72,3 +75,6 @@ you may lose this part of data. Remount will crash, because you only have meta b
 | v1.0.0                     | v2.3.0-rc0      | dingodatabase/dingofs-csi:v1.0.0 |
 | v1.1 | v2.4.0-beta2 | dingodatabase/dingofs-csi:v1.1|
 | v2.1 | v2.5.0-beta | dingodatabase/dingofs-csi:v2.1|
+| v3.1 | v3.0~v4.0 | dingodatabase/dingofs-csi:v3.1|
+| v4.1 | v5.0 | dingodatabase/dingofs-csi:v4.1|
+| v5.1 | v5.1 | dingodatabase/dingofs-csi:v5.1|

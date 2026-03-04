@@ -381,7 +381,7 @@ func (d *dingofs) SetQuota(ctx context.Context, secrets map[string]string, dfsSe
 		return fmt.Errorf("capacity %d is too small, at least 1GiB for quota", capacity)
 	}
 
-	var args = []string{"quota", "set", "--fsname", secrets["name"], "--path", quotaPath, "--capacity", strconv.FormatInt(cap, 10), "--mdsaddr", secrets["mdsAddr"]}
+	var args = []string{"fs", "quota", "set", "--fsname", secrets["name"], "--path", quotaPath, "--capacity", strconv.FormatInt(cap, 10), "--mdsaddr", secrets["mdsAddr"]}
 
 	klog.Info("quota command:", strings.Join(args, " "))
 	cmdCtx, cmdCancel := context.WithTimeout(ctx, 5*defaultCheckTimeout)
