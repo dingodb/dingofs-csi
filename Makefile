@@ -1,9 +1,10 @@
-CSI_IMAGE_NAME ?= dingodatabase/dingofs-csi
-DRIVER_VERSION ?= v5.1.0
+# CSI_IMAGE_NAME ?= dingodatabase/dingofs-csi
+CSI_IMAGE_NAME ?= harbor.zetyun.cn/dingofs/dingofs-csi
+DRIVER_VERSION ?= v5.1-b1ec0f8
 LAST_COMMIT ?= $(shell git rev-parse --short HEAD)
 BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-IMAGE_TAG := $(CSI_IMAGE_NAME):$(DRIVER_VERSION)
+IMAGE_TAG := $(CSI_IMAGE_NAME):$(LAST_COMMIT)-$(DRIVER_VERSION)
 
 GO_PROJECT := github.com/jackblack369/dingofs-csi
 
