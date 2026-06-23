@@ -1,4 +1,4 @@
-FROM harbor.zetyun.cn/dingofs/dingofs:e85953a
+FROM harbor.zetyun.cn/dingofs/dingofs:v5.1-b1ec0f8
 ADD bin/dingofs-csi-driver /usr/bin/dingofs-csi-driver
 # ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini-amd64 /bin/tini
 COPY bin/tini-amd64 /bin/tini
